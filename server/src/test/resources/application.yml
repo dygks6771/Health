@@ -1,0 +1,6 @@
+# 테스트는 H2(PostgreSQL 호환 모드)로 실행 → Docker 없이도 ./gradlew test 가능
+spring:
+  datasource:
+    url: jdbc:h2:mem:healthrpg;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
