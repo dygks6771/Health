@@ -4,6 +4,8 @@
 
     <!-- Health Connect 걸음수 읽기 권한 (삼성헬스 → Health Connect 로 동기화된 데이터) -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <!-- 개발용: 테스트 걸음수 기록 (삼성헬스 연동 없이 읽기 코드 검증용) -->
+    <uses-permission android:name="android.permission.health.WRITE_STEPS" />
 
     <!-- Android 13 이하: Health Connect 앱 설치 여부 확인용 -->
     <queries>

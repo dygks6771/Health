@@ -101,18 +101,48 @@ fun StepsTestScreen(modifier: Modifier = Modifier) {
 
             StepsUiState.NeedPermission -> {
                 Text("걸음수 읽기 권한이 필요합니다.")
-                Button(onClick = { permissionLauncher.launch(reader.permissions) }) { Text("권한 요청") }
+                Button(onClick = { permissionLauncher.launch(reader.permissions + reader.writePermissions) }) {
+                    Text("권한 요청")
+                }
             }
 
             is StepsUiState.Error -> {
                 Text("오류: ${s.message}", color = MaterialTheme.colorScheme.error)
             }
 
-            is StepsUiState.Loaded -> LoadedContent(s)
+            is StepsUiState.Loaded -> {
+                LoadedContent(s)
+                TestDataButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                if (reader.hasWritePermission()) {
+                                    reader.insertTestSteps()
+                                    refresh()
+                                } else {
+                                    permissionLauncher.launch(reader.writePermissions)
+                                }
+                            } catch (e: Exception) {
+                                state = StepsUiState.Error(e.message ?: e.javaClass.simpleName)
+                            }
+                        }
+                    },
+                )
+            }
         }
 
         OutlinedButton(onClick = { scope.launch { refresh() } }) { Text("새로고침") }
     }
+}
+
+/** 개발용: 삼성헬스 연동 없이 읽기 코드를 검증하기 위해 Health Connect 에 직접 걸음수를 기록 */
+@Composable
+private fun TestDataButton(onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick) { Text("[테스트] 걸음수 500 기록") }
+    Text(
+        "누르면 이 앱 이름으로 500걸음이 기록되고, 오늘 걸음수와 데이터 출처에 바로 반영되어야 합니다.",
+        style = MaterialTheme.typography.bodySmall,
+    )
 }
 
 @Composable

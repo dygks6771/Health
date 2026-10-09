@@ -5,9 +5,11 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.metadata.DataOrigin
+import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import java.time.Instant
 import java.time.LocalDate
 import java.time.Period
 import java.time.ZoneId
@@ -24,6 +26,9 @@ import java.time.ZoneId
 class StepsReader(private val context: Context) {
 
     val permissions = setOf(HealthPermission.getReadPermission(StepsRecord::class))
+
+    /** 개발용 테스트 데이터 기록 권한. 읽기 권한과 같이 요청한다 */
+    val writePermissions = setOf(HealthPermission.getWritePermission(StepsRecord::class))
 
     private val client by lazy { HealthConnectClient.getOrCreate(context) }
 
@@ -74,6 +79,31 @@ class StepsReader(private val context: Context) {
             DailySteps(date, byDate[date] ?: 0L)
         }
     }
+
+    /**
+     * 개발용: 방금 전 1분 동안 [count] 걸음을 걸은 것으로 Health Connect 에 기록.
+     * 삼성헬스 연동과 무관하게 읽기 코드가 동작하는지 확인하는 용도.
+     */
+    suspend fun insertTestSteps(count: Long = 500) {
+        val end = Instant.now()
+        val start = end.minusSeconds(60)
+        val zone = ZoneId.systemDefault().rules
+        client.insertRecords(
+            listOf(
+                StepsRecord(
+                    startTime = start,
+                    startZoneOffset = zone.getOffset(start),
+                    endTime = end,
+                    endZoneOffset = zone.getOffset(end),
+                    count = count,
+                    metadata = Metadata.manualEntry(),
+                ),
+            ),
+        )
+    }
+
+    suspend fun hasWritePermission(): Boolean =
+        client.permissionController.getGrantedPermissions().containsAll(writePermissions)
 
     companion object {
         const val SAMSUNG_HEALTH_PACKAGE = "com.sec.android.app.shealth"
