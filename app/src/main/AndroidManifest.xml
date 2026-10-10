@@ -7,6 +7,9 @@
     <!-- 개발용: 테스트 걸음수 기록 (삼성헬스 연동 없이 읽기 코드 검증용) -->
     <uses-permission android:name="android.permission.health.WRITE_STEPS" />
 
+    <!-- 서버 동기화 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Android 13 이하: Health Connect 앱 설치 여부 확인용 -->
     <queries>
         <package android:name="com.google.android.apps.healthdata" />

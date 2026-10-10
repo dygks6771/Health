@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import com.example.health.sync.SyncSection
 import kotlinx.coroutines.launch
 
 private sealed interface StepsUiState {
@@ -112,6 +113,7 @@ fun StepsTestScreen(modifier: Modifier = Modifier) {
 
             is StepsUiState.Loaded -> {
                 LoadedContent(s)
+                SyncSection(reader)
                 TestDataButton(
                     onClick = {
                         scope.launch {
