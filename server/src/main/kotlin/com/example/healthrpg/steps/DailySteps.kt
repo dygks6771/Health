@@ -37,6 +37,10 @@ class DailySteps(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
 
+    /** 이 날 걸음수로 이미 지급한 경험치 (중복 지급 방지) */
+    @Column(name = "exp_awarded", nullable = false)
+    var expAwarded: Int = 0
+
     @Column(name = "synced_at", nullable = false)
     var syncedAt: Instant = Instant.now()
 }

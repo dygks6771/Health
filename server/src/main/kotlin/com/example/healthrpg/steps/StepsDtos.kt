@@ -1,5 +1,7 @@
 package com.example.healthrpg.steps
 
+import com.example.healthrpg.game.CharacterResponse
+import com.example.healthrpg.game.SyncRewardResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.PositiveOrZero
@@ -43,4 +45,12 @@ data class StepsSummaryResponse(
     val to: LocalDate,
     val totalSteps: Long,
     val days: List<DailyStepsResponse>,
+)
+
+data class SyncStepsResponse(
+    val days: List<DailyStepsResponse>,
+    /** 이번 동기화로 얻은 경험치·골드·완료한 퀘스트 */
+    val reward: SyncRewardResponse,
+    /** 동기화 후 캐릭터 상태 */
+    val character: CharacterResponse,
 )

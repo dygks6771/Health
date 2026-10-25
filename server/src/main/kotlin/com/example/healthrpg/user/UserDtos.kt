@@ -19,6 +19,7 @@ data class UserResponse(
     val nickname: String,
     val level: Int,
     val exp: Long,
+    val gold: Long,
     val createdAt: Instant,
 ) {
     companion object {
@@ -27,6 +28,7 @@ data class UserResponse(
             nickname = user.nickname,
             level = user.level,
             exp = user.exp,
+            gold = user.gold,
             createdAt = user.createdAt,
         )
     }

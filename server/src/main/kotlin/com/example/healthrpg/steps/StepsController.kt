@@ -20,8 +20,7 @@ class StepsController(
     fun sync(
         @PathVariable userId: Long,
         @Valid @RequestBody request: SyncStepsRequest,
-    ): List<DailyStepsResponse> =
-        stepsService.sync(userId, request).map(DailyStepsResponse::from)
+    ): SyncStepsResponse = stepsService.sync(userId, request)
 
     @GetMapping
     fun summary(

@@ -26,8 +26,12 @@ class User(
     @Column(nullable = false)
     var level: Int = 1
 
+    /** 누적 경험치. 레벨은 이 값으로 계산 (GameRules) */
     @Column(nullable = false)
     var exp: Long = 0
+
+    @Column(nullable = false)
+    var gold: Long = 0
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.now()
