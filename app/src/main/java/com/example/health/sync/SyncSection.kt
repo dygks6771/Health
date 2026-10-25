@@ -92,7 +92,8 @@ fun SyncSection(reader: StepsReader, modifier: Modifier = Modifier) {
                             val r = syncer.sync()
                             val match = if (r.serverTotal == r.localTotal) "일치" else "불일치!"
                             "사용자 #${r.userId} · 최근 ${r.syncedDays}일 동기화 완료\n" +
-                                "앱 %,d걸음 / 서버 저장 %,d걸음 ($match)".format(r.localTotal, r.serverTotal)
+                                "앱 %,d걸음 / 서버 저장 %,d걸음 ($match)\n".format(r.localTotal, r.serverTotal) +
+                                "보상 EXP +${r.reward.expGained} · 골드 +${r.reward.goldGained}"
                         }
                     },
                 ) { Text("서버로 동기화") }

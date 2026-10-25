@@ -28,8 +28,8 @@ class ServerApi(baseUrl: String) {
             JSONObject().put("deviceId", deviceId).put("nickname", nickname),
         ).getLong("id")
 
-    /** POST /api/users/{id}/steps → 날짜별 걸음수 upsert */
-    suspend fun syncSteps(userId: Long, days: List<DailySteps>, source: String?) {
+    /** POST /api/users/{id}/steps → 날짜별 걸음수 upsert. 응답: days, reward(보상), character */
+    suspend fun syncSteps(userId: Long, days: List<DailySteps>, source: String?): JSONObject {
         val entries = JSONArray()
         days.forEach { day ->
             entries.put(
@@ -39,8 +39,11 @@ class ServerApi(baseUrl: String) {
                     .put("source", source ?: JSONObject.NULL),
             )
         }
-        request("POST", "/api/users/$userId/steps", JSONObject().put("entries", entries))
+        return request("POST", "/api/users/$userId/steps", JSONObject().put("entries", entries))
     }
+
+    /** GET /api/users/{id}/character → 레벨, 경험치, 골드, 퀘스트 */
+    suspend fun character(userId: Long): JSONObject = request("GET", "/api/users/$userId/character")
 
     /** GET /api/users/{id}/steps → 서버에 저장된 기간 합계 */
     suspend fun totalSteps(userId: Long, from: LocalDate, to: LocalDate): Long =
@@ -67,7 +70,6 @@ class ServerApi(baseUrl: String) {
                     val message = runCatching { JSONObject(text).getString("message") }.getOrDefault(text)
                     throw ServerException(code, "HTTP $code: $message")
                 }
-                // 응답이 배열(걸음수 동기화 결과)인 경우는 내용을 쓰지 않으므로 빈 객체로 처리
                 if (text.trimStart().startsWith("{")) JSONObject(text) else JSONObject()
             } finally {
                 conn.disconnect()

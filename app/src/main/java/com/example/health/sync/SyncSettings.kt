@@ -21,6 +21,16 @@ class SyncSettings(context: Context) {
         get() = prefs.getLong(KEY_USER_ID, -1).takeIf { it > 0 }
         set(value) = prefs.edit().putLong(KEY_USER_ID, value ?: -1).apply()
 
+    /** 마지막으로 동기화에 성공한 시각 (epoch ms, 없으면 0) */
+    var lastSyncAt: Long
+        get() = prefs.getLong(KEY_LAST_SYNC_AT, 0)
+        set(value) = prefs.edit().putLong(KEY_LAST_SYNC_AT, value).apply()
+
+    /** 서버에 연결되지 않을 때도 보여줄 수 있도록 마지막 캐릭터 상태를 저장 */
+    var cachedCharacterJson: String?
+        get() = prefs.getString(KEY_CHARACTER, null)
+        set(value) = prefs.edit().putString(KEY_CHARACTER, value).apply()
+
     companion object {
         /**
          * USB 연결 + `adb reverse tcp:8080 tcp:8080` 을 하면 폰의 127.0.0.1:8080 이 PC 의 8080 으로 연결됨.
@@ -31,5 +41,7 @@ class SyncSettings(context: Context) {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_USER_ID = "user_id"
+        private const val KEY_LAST_SYNC_AT = "last_sync_at"
+        private const val KEY_CHARACTER = "character"
     }
 }

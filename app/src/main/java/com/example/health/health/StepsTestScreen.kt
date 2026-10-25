@@ -102,7 +102,7 @@ fun StepsTestScreen(modifier: Modifier = Modifier) {
 
             StepsUiState.NeedPermission -> {
                 Text("걸음수 읽기 권한이 필요합니다.")
-                Button(onClick = { permissionLauncher.launch(reader.permissions + reader.writePermissions) }) {
+                Button(onClick = { permissionLauncher.launch(reader.requestPermissions + reader.writePermissions) }) {
                     Text("권한 요청")
                 }
             }
