@@ -74,7 +74,7 @@ class GameApiTest(
         assertEquals(3, result["reward"]["levelAfter"].asInt())
         assertEquals(6, result["hero"]["statPoints"].asInt())
         assertEquals(5 + 3 + 2, result["hero"]["stats"][2]["base"].asInt())
-        assertEquals(50, result["hero"]["stamina"].asInt())
+        assertEquals(0, result["hero"]["stamina"].asInt()) // 러닝은 행동력을 주지 않음 (걸음수로 충전)
 
         api.post(token, "/api/me/hero/stats", """{"attack":6}""").andExpect {
             status { isOk() }
@@ -87,6 +87,7 @@ class GameApiTest(
         val token = api.signup()
         api.createHero(token)
         api.run(token, 5)
+        api.steps(token, 5_000)
 
         val board = api.json(api.get(token, "/api/me/guild/hunts"))
         val hunts = board["hunts"]
@@ -115,6 +116,7 @@ class GameApiTest(
         val token = api.signup()
         api.createHero(token)
         api.run(token, 5)
+        api.steps(token, 5_000)
 
         val world = api.json(api.get(token, "/api/me/world"))
         assertEquals(10, world["regions"].size())
@@ -139,6 +141,7 @@ class GameApiTest(
         val hero = api.createHero(token)
         val weaponId = hero["equipment"][0]["id"].asLong()
         api.run(token, 5)
+        api.steps(token, 5_000)
         api.post(token, "/api/me/world/1/dungeon")
 
         // +0 → +1 은 성공률 100%: 강화석 1, 골드 30
@@ -180,6 +183,7 @@ class GameApiTest(
         val token = api.signup()
         api.createHero(token)
         api.run(token, 10)
+        api.steps(token, 20_000)
 
         api.post(token, "/api/me/raid", """{"friendHeroIds":[1,2,3,4]}""").andExpect { status { isBadRequest() } }
 
@@ -194,7 +198,7 @@ class GameApiTest(
         assertEquals(5, result["members"].size())
         assertTrue(result["totalDamage"].asLong() > 0)
         assertTrue(result["grade"].asString() in listOf("S", "A", "B", "C", "D", "E", "F"))
-        assertEquals(100 - 30, result["hero"]["stamina"].asInt())
+        assertEquals(150 - 30, result["hero"]["stamina"].asInt())
 
         api.get(token, "/api/me/raid").andExpect {
             jsonPath("$.friends.length()") { value(4) }

@@ -14,6 +14,7 @@ import com.example.healthrpg.item.ItemFactory
 import com.example.healthrpg.item.ItemRepository
 import com.example.healthrpg.item.ItemResponse
 import com.example.healthrpg.run.RunSessionRepository
+import com.example.healthrpg.step.StepDayRepository
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -30,6 +31,7 @@ class HeroService(
     private val itemRepository: ItemRepository,
     private val itemFactory: ItemFactory,
     private val runSessionRepository: RunSessionRepository,
+    private val stepDayRepository: StepDayRepository,
     @Value("\${game.zone:Asia/Seoul}") zone: String,
 ) {
     val zoneId: ZoneId = ZoneId.of(zone)
@@ -119,6 +121,7 @@ class HeroService(
         val stats = Stat.entries.associateWith { hero.baseStat(it) + (bonus[it] ?: 0) }
         val today = today()
         val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val todayStep = stepDayRepository.findByHeroIdAndStepDate(heroId, today)
         return HeroResponse(
             id = heroId,
             name = hero.name,
@@ -143,6 +146,9 @@ class HeroService(
             todayKm = runSessionRepository.sumDistanceMeters(heroId, today, today) / 1000.0,
             todayRewardKm = runSessionRepository.sumCountedMeters(heroId, today, today) / 1000.0,
             weekKm = runSessionRepository.sumDistanceMeters(heroId, weekStart, today) / 1000.0,
+            todaySteps = todayStep?.steps ?: 0,
+            todayStepStamina = todayStep?.staminaAwarded ?: 0,
+            dailyStepStaminaCap = GameRules.DAILY_STEP_STAMINA_CAP,
         )
     }
 

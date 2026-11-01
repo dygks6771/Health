@@ -55,6 +55,10 @@ data class HeroResponse(
     /** 오늘 실제로 보상받은 거리 (속도 초과·하루 상한 제외) */
     val todayRewardKm: Double,
     val weekKm: Double,
+    /** 오늘 걸음수와 그 걸음으로 받은 행동력 (하루 상한 [dailyStepStaminaCap]) */
+    val todaySteps: Long,
+    val todayStepStamina: Int,
+    val dailyStepStaminaCap: Int,
 )
 
 /** 다른 영웅(친구) 요약 */

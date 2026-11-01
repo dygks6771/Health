@@ -41,7 +41,6 @@ data class RunRewardResponse(
     val countedKm: Double,
     val expGained: Long,
     val goldGained: Long,
-    val staminaGained: Int,
     val levelBefore: Int,
     val levelAfter: Int,
     val statPointsGained: Int,
@@ -83,7 +82,6 @@ class RunService(
         var countedMeters = 0L
         var exp = 0L
         var gold = 0L
-        var stamina = 0
         val rejected = mutableListOf<String>()
 
         for (run in request.runs.sortedBy { it.startTime }.distinctBy { it.externalId }) {
@@ -94,24 +92,13 @@ class RunService(
             val hours = Duration.between(run.startTime, run.endTime).toMillis() / 3_600_000.0
             val speedKmh = run.distanceMeters / 1000.0 / hours
 
-            var reason: String? = null
-            var counted = 0
-            if (speedKmh > GameRules.MAX_SPEED_KMH) {
-                reason = "속도 초과 (%.1f km/h)".format(speedKmh)
-            } else {
-                val usedToday = runSessionRepository.sumCountedMeters(heroId, runDate, runDate)
-                val left = (GameRules.DAILY_KM_CAP * 1000L - usedToday).coerceAtLeast(0)
-                counted = minOf(run.distanceMeters.toLong(), left).toInt()
-                if (counted < run.distanceMeters) reason = "하루 상한 ${GameRules.DAILY_KM_CAP}km 초과"
-            }
+            // 하루 상한은 없고, 차량 이동 같은 비정상 속도만 제외
+            val tooFast = speedKmh > GameRules.MAX_SPEED_KMH
+            val reason = if (tooFast) "속도 초과 (%.1f km/h)".format(speedKmh) else null
+            val counted = if (tooFast) 0 else run.distanceMeters
 
             val runExp = GameRules.rewardFor(counted, GameRules.EXP_PER_KM)
             val runGold = GameRules.rewardFor(counted, GameRules.GOLD_PER_KM)
-            val runStamina = minOf(
-                GameRules.rewardFor(counted, GameRules.STAMINA_PER_KM),
-                GameRules.MAX_STAMINA - hero.stamina,
-            ).coerceAtLeast(0)
-            hero.stamina += runStamina
             hero.gold += runGold
 
             runSessionRepository.save(
@@ -125,7 +112,7 @@ class RunService(
                     countedMeters = counted,
                     expAwarded = runExp,
                     goldAwarded = runGold,
-                    staminaAwarded = runStamina,
+                    staminaAwarded = 0,
                     rejectedReason = reason,
                 ),
             )
@@ -134,7 +121,6 @@ class RunService(
             countedMeters += counted
             exp += runExp
             gold += runGold
-            stamina += runStamina
             if (reason != null) rejected += "$runDate %.2fkm: $reason".format(run.distanceMeters / 1000.0)
         }
 
@@ -145,7 +131,6 @@ class RunService(
                 countedKm = countedMeters / 1000.0,
                 expGained = exp,
                 goldGained = gold,
-                staminaGained = stamina,
                 levelBefore = levelBefore,
                 levelAfter = levelAfter,
                 statPointsGained = GameRules.STAT_POINTS_PER_LEVEL * (levelAfter - levelBefore),

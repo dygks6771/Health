@@ -2,21 +2,25 @@ package com.example.healthrpg.game
 
 import kotlin.math.roundToInt
 
-/** 러닝 보상, 레벨업, 전투력 규칙. 밸런스 숫자는 game 패키지에서만 바꾸면 됨 */
+/** 러닝·걸음 보상, 레벨업, 전투력 규칙. 밸런스 숫자는 game 패키지에서만 바꾸면 됨 */
 object GameRules {
-    /** 러닝 1km 당 보상 */
+    /** 러닝 1km 당 보상 (하루 상한 없음) */
     const val EXP_PER_KM = 50
     const val GOLD_PER_KM = 20
-    const val STAMINA_PER_KM = 10
 
-    /** 하루에 보상받을 수 있는 최대 러닝 거리 (조작·과도한 보상 방지) */
-    const val DAILY_KM_CAP = 20
-
-    /** 이보다 빠른 평균 속도의 기록은 러닝이 아닌 것으로 보고 보상하지 않음 (차량 이동 등) */
+    /** 이보다 빠른 평균 속도의 기록은 러닝이 아닌 것으로 보고 보상하지 않음 (차량·자전거 이동 등) */
     const val MAX_SPEED_KMH = 25.0
 
-    /** 컨텐츠 입장에 쓰는 행동력 최대치 */
+    /** 걸음수 100보 = 행동력 1 */
+    const val STEPS_PER_STAMINA = 100
+
+    /** 하루에 걸음으로 얻을 수 있는 행동력 상한 (15,000보) */
+    const val DAILY_STEP_STAMINA_CAP = 150
+
+    /** 컨텐츠 입장에 쓰는 행동력 최대 보유량 */
     const val MAX_STAMINA = 300
+
+    fun staminaForSteps(steps: Long): Int = (steps / STEPS_PER_STAMINA).coerceIn(0, DAILY_STEP_STAMINA_CAP.toLong()).toInt()
 
     /** 레벨업마다 자유롭게 찍는 포인트. 이와 별도로 직업 주 능력치가 +1 자동 상승 */
     const val STAT_POINTS_PER_LEVEL = 3

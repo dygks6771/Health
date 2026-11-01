@@ -41,6 +41,10 @@ class ApiTestSupport(private val mockMvc: MockMvc, private val objectMapper: Obj
             }.andExpect { status { isOk() } },
         )
 
+    /** 오늘(게임 시간대) 걸음수 → 행동력 (100보 = 1, 하루 최대 150) */
+    fun steps(token: String, steps: Long, date: String = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString()): JsonNode =
+        json(post(token, "/api/me/steps", """{"days":[{"date":"$date","steps":$steps}]}""").andExpect { status { isOk() } })
+
     fun get(token: String, path: String): ResultActionsDsl = mockMvc.get(path) { auth(token) }
 
     fun post(token: String, path: String, body: String? = null): ResultActionsDsl = mockMvc.post(path) {

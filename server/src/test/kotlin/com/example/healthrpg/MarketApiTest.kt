@@ -71,6 +71,7 @@ class MarketApiTest(
         val token = api.signup()
         api.createHero(token)
         api.run(token, 20)
+        api.steps(token, 15_000)
         val friends = api.json(api.post(token, "/api/dev/friend-bots"))["friends"]
         val ids = (0 until 4).map { friends[it]["hero"]["id"].asLong() }
 

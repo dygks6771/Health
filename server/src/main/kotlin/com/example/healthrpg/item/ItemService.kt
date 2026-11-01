@@ -2,6 +2,7 @@ package com.example.healthrpg.item
 
 import com.example.healthrpg.common.BadRequestException
 import com.example.healthrpg.common.NotFoundException
+import com.example.healthrpg.game.Grade
 import com.example.healthrpg.game.ItemRules
 import com.example.healthrpg.hero.HeroResponse
 import com.example.healthrpg.hero.HeroService
@@ -10,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional
 import kotlin.random.Random
 
 data class InventoryResponse(val items: List<ItemResponse>, val hero: HeroResponse)
+
+data class BulkSellResponse(val soldCount: Int, val gold: Long, val inventory: InventoryResponse)
 
 data class EnhanceResultResponse(
     val success: Boolean,
@@ -65,6 +68,18 @@ class ItemService(
         hero.gold += ItemRules.sellPrice(item.tier, item.gradeEnum, item.enhance)
         itemRepository.delete(item)
         return inventory(accountId)
+    }
+
+    /** [maxGrade] 이하 등급의 미장착·미등록 장비를 한 번에 판매 */
+    @Transactional
+    fun sellBulk(accountId: Long, maxGrade: Grade): BulkSellResponse {
+        val hero = heroService.requireForUpdate(accountId)
+        val targets = itemRepository.findAllByHeroIdOrderByEquippedDescIdDesc(hero.id!!)
+            .filter { !it.equipped && !it.listed && it.gradeEnum <= maxGrade }
+        val gold = targets.sumOf { ItemRules.sellPrice(it.tier, it.gradeEnum, it.enhance) }
+        hero.gold += gold
+        itemRepository.deleteAll(targets)
+        return BulkSellResponse(targets.size, gold, inventory(accountId))
     }
 
     /** 대장간 강화: 강화석과 골드를 쓰고 확률로 +1. 실패해도 단계는 유지 */
