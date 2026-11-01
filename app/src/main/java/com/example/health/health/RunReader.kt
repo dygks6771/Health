@@ -5,6 +5,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
@@ -99,7 +100,8 @@ class RunReader(private val context: Context) {
         val start = end.minusSeconds(20 * 60)
         val rules = ZoneId.systemDefault().rules
         client.insertRecords(
-            listOf(
+            // 타입을 명시하지 않으면 내부 전용 공통 타입(IntervalRecord)으로 추론돼 컴파일 오류
+            listOf<Record>(
                 ExerciseSessionRecord(
                     startTime = start,
                     startZoneOffset = rules.getOffset(start),
