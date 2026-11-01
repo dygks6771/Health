@@ -1,7 +1,6 @@
 package com.example.healthrpg.steps
 
 import com.example.healthrpg.common.BadRequestException
-import com.example.healthrpg.game.GameService
 import com.example.healthrpg.user.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -14,17 +13,16 @@ import java.time.temporal.ChronoUnit
 class StepsService(
     private val userService: UserService,
     private val dailyStepsRepository: DailyStepsRepository,
-    private val gameService: GameService,
 ) {
     /**
-     * 날짜별 걸음수 upsert 후 경험치·퀘스트 보상 지급.
+     * 날짜별 걸음수 upsert (기록용. 게임 보상은 러닝 거리로만 지급).
      * Health Connect 집계값이 그날의 최신 누적값이므로 같은 날짜는 덮어쓴다.
      */
     @Transactional
-    fun sync(userId: Long, request: SyncStepsRequest): SyncStepsResponse {
-        val user = userService.getForUpdate(userId)
+    fun sync(userId: Long, request: SyncStepsRequest): List<DailySteps> {
+        val user = userService.get(userId)
         val now = Instant.now()
-        val days = request.entries
+        return request.entries
             .associateBy { it.date } // 같은 날짜가 중복으로 오면 마지막 값 사용
             .values
             .map { entry ->
@@ -42,13 +40,6 @@ class StepsService(
                 }
             }
             .sortedBy { it.date }
-
-        val reward = gameService.applySync(user, days)
-        return SyncStepsResponse(
-            days = days.map(DailyStepsResponse::from),
-            reward = reward,
-            character = gameService.character(userId),
-        )
     }
 
     fun summary(userId: Long, from: LocalDate, to: LocalDate): StepsSummaryResponse {

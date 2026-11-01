@@ -37,7 +37,7 @@ class DailySteps(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
 
-    /** 이 날 걸음수로 이미 지급한 경험치 (중복 지급 방지) */
+    /** 걸음수 보상을 주던 시기(V2)의 지급 기록. 지금은 러닝으로만 보상하므로 사용하지 않음 */
     @Column(name = "exp_awarded", nullable = false)
     var expAwarded: Int = 0
 

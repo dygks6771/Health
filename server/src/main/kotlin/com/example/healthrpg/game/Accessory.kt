@@ -13,26 +13,32 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.Instant
-import java.time.LocalDate
 
 @Entity
-@Table(name = "quest_completions")
-class QuestCompletion(
+@Table(name = "accessories")
+class Accessory(
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     val user: User,
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "quest_code", nullable = false, length = 50)
-    val quest: Quest,
+    @Column(nullable = false, length = 20)
+    val type: AccessoryType,
 
-    @Column(name = "period_start", nullable = false)
-    val periodStart: LocalDate,
+    /** Grade.ordinal */
+    @Column(nullable = false)
+    val grade: Int,
+
+    @Column(name = "stat_bonus", nullable = false)
+    val statBonus: Int,
+
+    @Column(nullable = false)
+    var equipped: Boolean = false,
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
 
-    @Column(name = "completed_at", nullable = false)
-    val completedAt: Instant = Instant.now()
+    @Column(name = "obtained_at", nullable = false)
+    val obtainedAt: Instant = Instant.now()
 }
