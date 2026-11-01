@@ -25,58 +25,58 @@ DB 접속 정보는 환경변수로 바꿀 수 있음: `DB_URL`, `DB_USERNAME`, 
 
 ## API
 
+로그인 후 받은 토큰을 `Authorization: Bearer <토큰>` 헤더로 보냄. `/api/me/**` 는 모두 로그인 필요.
+
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/api/health` | 서버/DB 상태 |
-| POST | `/api/users` | 사용자 등록 `{"deviceId","nickname"}` — 같은 deviceId면 기존 사용자 반환 |
-| GET | `/api/users/{id}` | 사용자 조회 |
-| POST | `/api/users/{id}/runs` | **러닝 기록 동기화** → 보상 + 캐릭터 상태 |
-| GET | `/api/users/{id}/character` | 캐릭터: 레벨, 경험치, 골드, 행동력, 스탯, 무기, 장신구, 러닝 거리 |
-| POST | `/api/users/{id}/stats` | 스탯 포인트 찍기 `{"attack":1,"defense":0,"agility":0,"spirit":0}` |
-| POST | `/api/users/{id}/weapon/enhance` | 무기 강화 +1 (강화석 + 골드 소모) |
-| GET | `/api/users/{id}/content` | 토벌/던전/레이드 1~20단계 조건과 도전 가능 여부 |
-| POST | `/api/users/{id}/content/{HUNT\|DUNGEON\|RAID}/{1~20}` | 도전 → 보상 |
-| POST/GET | `/api/users/{id}/steps` | 걸음수 기록 (개발자 탭 확인용, 보상 없음) |
+| POST | `/api/auth/signup` · `/api/auth/login` | `{"loginId","password"}` → `{"token"}` |
+| POST | `/api/auth/logout` | 토큰 폐기 |
+| GET | `/api/game/meta` | 직업·외형 목록 (로그인 불필요) |
+| GET / POST | `/api/me/hero` | 내 영웅 조회 (없으면 404 `HERO_NOT_FOUND`) / 생성 `{"name","job","appearance"}` |
+| POST | `/api/me/hero/stats` | 능력치 찍기 `{"attack":1}` |
+| POST | `/api/me/runs` | 러닝 기록 동기화 → 보상 |
+| GET | `/api/me/items` | 가방 |
+| POST | `/api/me/items/{id}/equip` · `unequip` · `sell` | 장착 / 해제 / 판매 |
+| POST | `/api/me/smith/{id}/enhance` | 대장간 강화 |
+| GET / POST | `/api/me/guild/hunts` · `/{slot}` | 모험자 길드 오늘의 토벌 5개 / 토벌 |
+| GET / POST | `/api/me/world` · `/{1~10}/dungeon` | 10개 지역·던전 / 던전 공략 |
+| GET / POST / DELETE | `/api/me/friends` · `/{id}/accept` · `/{id}` | 친구 목록·요청 `{"name"}` / 수락 / 삭제 |
+| GET / POST | `/api/me/raid` | 레이드 정보 / 공격 `{"friendHeroIds":[4명]}` |
+| POST | `/api/dev/friend-bots` | **개발용** 친구 봇 4명 (`GAME_DEV_TOOLS=false` 면 비활성) |
 
-러닝 동기화 예시:
+## 게임 규칙 (`game/` 패키지)
 
-```bash
-curl -X POST localhost:8080/api/users/1/runs -H 'Content-Type: application/json' \
-  -d '{"runs":[{"externalId":"hc-1","startTime":"2026-11-01T00:00:00Z","endTime":"2026-11-01T00:30:00Z","distanceMeters":5000}]}'
-```
+**러닝 보상** — 1km 당 EXP 50 · 골드 20 · 행동력 10 (최대 300). 하루 20km 까지, 시속 25km 초과 기록은 제외
 
-## 게임 규칙 (`game/GameRules.kt`, `game/ContentType.kt`)
+**영웅** — 직업 5종(기사·전사·궁수·마법사·성직자). 생성 시 주 능력치 +3, 보조 +2.
+레벨업마다 포인트 3 + 주 능력치 +1. 전투력 = 능력치 합 × 3 + 레벨 × 10
 
-**러닝 보상** (Health Connect 러닝 기록 1건당 한 번만)
-- 1km 당 EXP 50 · 골드 20 · 행동력 10 (행동력 최대 300)
-- 하루 최대 20km 까지만 보상, 평균 25km/h 를 넘는 기록은 보상 제외
+**장비** — 무기(공격력)·갑옷(방어력)·장화(민첩성)·목걸이(정신력). 등급 일반~전설, 수치 = (3 + 3×티어) × 등급배율.
+희귀 이상은 보조 능력치 추가. 대장간 강화 +15 까지 (1단계당 +10%, 성공률 100% → 15%, 실패해도 단계 유지)
 
-**레벨·스탯**
-- 레벨업 필요 EXP: Lv1→2 는 100, 레벨마다 50씩 증가
-- 레벨업마다 스탯 포인트 3 → 공격력/방어력/민첩성/정신력에 자유롭게 (기본값 각 5)
-- 무기 강화: +N → +N+1 에 강화석 N+1개, 골드 100×(N+1). 강화 1당 공격력 +2
-- 무기 등급: +0~3 일반, +4~7 고급, +8~11 희귀, +12~15 영웅, +16~20 전설
+**모험자 길드** — 매일 토벌 의뢰 5개: 쉬움 2 (레벨-2, -3) · 적정 2 (레벨) · 도전 1 (레벨+1). 권장 전투력 이상이면 토벌, 골드 보상
 
-**컨텐츠** (각 1~20단계, 조건을 모두 만족하면 행동력을 쓰고 클리어)
+**던전** (`game/Region.kt`) — 초보자 마을(Lv1) ~ 마왕성 외곽(Lv46) 10개 지역. 최소 레벨 1 + 5(티어-1), 최소 능력치 합 20 + 24(티어-1).
+보상: 강화석 2×티어, 골드 40×티어, 60% 확률로 지역 티어 장비 (고티어일수록 높은 등급 확률)
 
-| 컨텐츠 | 행동력 | 보상 | 최소 레벨 | 필요 능력치 (단계 d) |
-|---|---|---|---|---|
-| 토벌 | 10 | 골드 50×d | 1 + 2(d-1) | 공격력·민첩성 5 + 2(d-1) |
-| 던전 | 20 | 강화석 2×d 개 | 3 + 2(d-1) | 공격력·방어력 5 + 2(d-1) |
-| 레이드 | 30 | 장신구 1개 | 5 + 2(d-1) | 4가지 모두 5 + (d-1) |
-
-- 최소 무기 등급: 1~4단계 일반, 5~8 고급, 9~12 희귀, 13~16 영웅, 17~20 전설
-- 장신구: 레이드 단계 등급으로 반지(공격력)/팔찌(방어력)/귀걸이(민첩성)/목걸이(정신력) 중 하나.
-  보너스 일반 3 ~ 전설 15. 종류별로 가장 좋은 것 자동 장착
+**레이드** (`game/Raid.kt`) — 본인 + 친구 4명, 10턴. 누적 데미지 3,000 / 9,000 / 20,000 에서 마룡이 진화하며 받는 피해 100% → 45%.
+총 데미지로 F~S 등급 (S 30,000+), A 이상은 목걸이 보상
 
 ## 구조
 
 ```
 src/main/kotlin/com/example/healthrpg
 ├── common/   헬스체크, 예외 처리
-├── user/     사용자(플레이어) — 레벨, 경험치, 골드, 스탯, 장비
+├── auth/     회원가입·로그인·토큰
+├── hero/     영웅 생성·능력치·전투력
 ├── run/      러닝 기록 동기화와 보상
-├── game/     게임 규칙, 캐릭터·스탯·강화, 토벌/던전/레이드
-└── steps/    날짜별 걸음수 (기록용)
+├── item/     장비·가방·대장간
+├── guild/    모험자 길드 일일 토벌
+├── world/    10개 지역 던전
+├── friend/   친구
+├── raid/     레이드
+├── dev/      개발용 API
+├── game/     게임 규칙·밸런스 숫자
 src/main/resources/db/migration   Flyway SQL (스키마 변경은 V2__*.sql 추가로)
 ```

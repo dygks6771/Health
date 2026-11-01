@@ -1,0 +1,130 @@
+package com.example.health.auth
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.health.net.ApiClient
+import com.example.health.net.Session
+import com.example.health.ui.fantasy.ActionFeedback
+import com.example.health.ui.fantasy.GoldButton
+import com.example.health.ui.fantasy.Panel
+import com.example.health.ui.fantasy.rememberActions
+import com.example.health.ui.theme.Gold
+import com.example.health.ui.theme.ParchmentDim
+
+/** 로그인 / 회원가입. 성공하면 토큰을 저장하고 [onLoggedIn] */
+@Composable
+fun AuthScreen(session: Session, api: ApiClient, onLoggedIn: () -> Unit) {
+    var signup by remember { mutableStateOf(false) }
+    var loginId by remember { mutableStateOf(session.loginId ?: "") }
+    var password by remember { mutableStateOf("") }
+    var passwordCheck by remember { mutableStateOf("") }
+    var showServer by remember { mutableStateOf(false) }
+    var serverUrl by remember { mutableStateOf(session.serverUrl) }
+    val actions = rememberActions()
+
+    fun submit() = actions.run {
+        session.serverUrl = serverUrl
+        if (signup && password != passwordCheck) error("비밀번호 확인이 일치하지 않습니다")
+        val result = if (signup) api.signup(loginId, password) else api.login(loginId, password)
+        session.token = result.getString("token")
+        session.loginId = result.getString("loginId")
+        onLoggedIn()
+        null
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("⚔️", fontSize = 64.sp)
+        Text("러너스 크로니클", style = MaterialTheme.typography.headlineMedium, color = Gold)
+        Text(
+            "달린 만큼 강해지는 모험가의 이야기",
+            color = ParchmentDim,
+            textAlign = TextAlign.Center,
+        )
+
+        Panel(title = if (signup) "모험가 등록" else "모험가 입장") {
+            OutlinedTextField(
+                value = loginId,
+                onValueChange = { loginId = it },
+                label = { Text("아이디 (영문 소문자·숫자 4~20자)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("비밀번호 (8자 이상)") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (signup) {
+                OutlinedTextField(
+                    value = passwordCheck,
+                    onValueChange = { passwordCheck = it },
+                    label = { Text("비밀번호 확인") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            ActionFeedback(actions)
+            GoldButton(
+                if (actions.busy) "..." else if (signup) "등록하고 시작하기" else "입장하기",
+                onClick = { submit() },
+                enabled = !actions.busy && loginId.isNotBlank() && password.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            TextButton(onClick = { signup = !signup }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text(if (signup) "이미 계정이 있나요? 로그인" else "처음인가요? 회원가입", color = Gold)
+            }
+        }
+
+        Row {
+            TextButton(onClick = { showServer = !showServer }) { Text("서버 설정", color = ParchmentDim) }
+        }
+        if (showServer) {
+            OutlinedTextField(
+                value = serverUrl,
+                onValueChange = { serverUrl = it },
+                label = { Text("서버 주소") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "USB: adb reverse tcp:8080 tcp:8080 후 http://127.0.0.1:8080\n와이파이: http://<PC IP>:8080",
+                color = ParchmentDim,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}

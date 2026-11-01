@@ -38,7 +38,7 @@ class RunReader(private val context: Context) {
     )
 
     /** 처음 권한을 요청할 때 한 번에 묻는 권한들 (백그라운드 읽기는 지원 기기에서만 표시됨) */
-    val requestPermissions: Set<String> get() = permissions + StepsReader.BACKGROUND_PERMISSION
+    val requestPermissions: Set<String> get() = permissions + BACKGROUND_PERMISSION
 
     /** 개발용 테스트 러닝 기록 권한 */
     val writePermissions = setOf(
@@ -124,6 +124,12 @@ class RunReader(private val context: Context) {
     }
 
     companion object {
+        /**
+         * 앱이 꺼져 있을 때(자동 동기화) Health Connect 를 읽기 위한 권한.
+         * 지원하지 않는 기기/Health Connect 버전에서는 권한 화면에 나오지 않고 무시된다.
+         */
+        const val BACKGROUND_PERMISSION = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+
         private val RUNNING_TYPES = setOf(
             ExerciseSessionRecord.EXERCISE_TYPE_RUNNING,
             ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL,

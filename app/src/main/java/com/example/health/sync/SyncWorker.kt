@@ -10,6 +10,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.example.health.health.RunReader
+import com.example.health.net.ApiException
+import com.example.health.net.Session
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -23,12 +25,18 @@ class SyncWorker(
         val reader = RunReader(applicationContext)
         if (reader.sdkStatus() != HealthConnectClient.SDK_AVAILABLE) return Result.success()
 
+        val session = Session(applicationContext)
+        if (session.token == null) return Result.success() // 로그인 전
+
         return try {
             if (!reader.hasAllPermissions()) return Result.success()
-            RunSyncer(reader, SyncSettings(applicationContext)).sync()
+            RunSyncer(reader, session).sync()
             Result.success()
         } catch (e: SecurityException) {
             // 백그라운드 읽기 권한이 없거나 지원하지 않는 기기: 앱을 열 때 동기화됨
+            Result.success()
+        } catch (e: ApiException) {
+            // 로그인 만료·영웅 없음 등: 재시도해도 같으므로 앱을 열 때 처리
             Result.success()
         } catch (e: IOException) {
             // 서버 꺼짐, 네트워크 끊김: 잠시 후 다시 시도

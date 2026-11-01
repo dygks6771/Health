@@ -31,11 +31,11 @@ class PermissionsRationaleActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding).padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Text("걸음수 데이터 사용 안내", style = MaterialTheme.typography.headlineSmall)
+                        Text("운동 데이터 사용 안내", style = MaterialTheme.typography.headlineSmall)
                         Text(
-                            "이 앱은 Health Connect 에 저장된 걸음수(삼성헬스 등)를 읽어 " +
-                                "캐릭터 경험치와 레벨을 계산하는 데 사용합니다. " +
-                                "걸음수 외의 건강 데이터는 읽지 않으며, 권한은 언제든 Health Connect 설정에서 해제할 수 있습니다.",
+                            "이 앱은 Health Connect 에 저장된 러닝 기록과 거리(삼성헬스 등)를 읽어 " +
+                                "영웅의 경험치·골드·행동력을 계산하는 데 사용합니다. " +
+                                "그 외의 건강 데이터는 읽지 않으며, 권한은 언제든 Health Connect 설정에서 해제할 수 있습니다.",
                         )
                         Button(onClick = { finish() }) { Text("확인") }
                     }
