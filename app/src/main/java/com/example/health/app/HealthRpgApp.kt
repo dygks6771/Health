@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.health.auction.AuctionScreen
 import com.example.health.auth.AuthScreen
 import com.example.health.bag.BagScreen
 import com.example.health.friend.FriendsScreen
@@ -31,6 +32,8 @@ import com.example.health.net.ApiClient
 import com.example.health.net.ApiException
 import com.example.health.net.Session
 import com.example.health.raid.RaidScreen
+import com.example.health.ranking.RankingScreen
+import com.example.health.shop.ShopScreen
 import com.example.health.settings.SettingsScreen
 import com.example.health.smith.SmithScreen
 import com.example.health.ui.fantasy.FantasyBackground
@@ -41,7 +44,7 @@ import com.example.health.world.WorldScreen
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
-enum class Screen { LOADING, AUTH, CREATE_HERO, LOBBY, WORLD, GUILD, RAID, SMITH, BAG, FRIENDS, SETTINGS }
+enum class Screen { LOADING, AUTH, CREATE_HERO, LOBBY, WORLD, GUILD, RAID, SMITH, BAG, FRIENDS, SETTINGS, SHOP, AUCTION, RANKING }
 
 /** 화면 이동: 로그인 → (영웅 없으면) 영웅 생성 → 로비 → 각 메뉴 */
 @Composable
@@ -110,6 +113,9 @@ fun HealthRpgApp(resumeKey: Int) {
                 screen == Screen.SMITH -> SmithScreen(api, current, onHeroJson, back)
                 screen == Screen.BAG -> BagScreen(api, current, onHeroJson, back)
                 screen == Screen.FRIENDS -> FriendsScreen(api, current, back)
+                screen == Screen.SHOP -> ShopScreen(api, current, onHeroJson, back)
+                screen == Screen.AUCTION -> AuctionScreen(api, current, onHeroJson, back)
+                screen == Screen.RANKING -> RankingScreen(api, back)
                 screen == Screen.SETTINGS -> SettingsScreen(session, api, onHeroJson, onLogout = ::logout, onBack = back)
             }
         }

@@ -36,6 +36,10 @@ class ApiClient(private val session: Session) {
 
     suspend fun hero(): JSONObject = obj("GET", "/api/me/hero")
 
+    /** 영웅 이름 중복 확인 → {available, reason} */
+    suspend fun nameAvailable(name: String): JSONObject =
+        obj("GET", "/api/game/names/available?name=" + java.net.URLEncoder.encode(name.trim(), "UTF-8"))
+
     suspend fun createHero(name: String, job: String, appearance: Int): JSONObject =
         obj("POST", "/api/me/hero", JSONObject().put("name", name).put("job", job).put("appearance", appearance))
 
@@ -64,6 +68,25 @@ class ApiClient(private val session: Session) {
     suspend fun sell(itemId: Long): JSONObject = obj("POST", "/api/me/items/$itemId/sell")
     suspend fun enhance(itemId: Long): JSONObject = obj("POST", "/api/me/smith/$itemId/enhance")
 
+    // ── 상점 ──
+    suspend fun shop(): JSONObject = obj("GET", "/api/me/shop")
+
+    /** [category] = WEAPON / ARMOR */
+    suspend fun draw(category: String): JSONObject = obj("POST", "/api/me/shop/$category/draw")
+
+    // ── 랭킹 ──
+    suspend fun ranking(): JSONObject = obj("GET", "/api/ranking?limit=100")
+
+    // ── 경매장 ──
+    suspend fun auction(slot: String?): JSONObject = obj("GET", "/api/me/auction" + (slot?.let { "?slot=$it" } ?: ""))
+    suspend fun auctionMine(): JSONObject = obj("GET", "/api/me/auction/mine")
+
+    suspend fun listItem(itemId: Long, price: Long): JSONObject =
+        obj("POST", "/api/me/auction", JSONObject().put("itemId", itemId).put("price", price))
+
+    suspend fun buyListing(listingId: Long): JSONObject = obj("POST", "/api/me/auction/$listingId/buy")
+    suspend fun cancelListing(listingId: Long): JSONObject = obj("POST", "/api/me/auction/$listingId/cancel")
+
     // ── 모험자 길드 ──
     suspend fun guild(): JSONObject = obj("GET", "/api/me/guild/hunts")
     suspend fun hunt(slot: Int): JSONObject = obj("POST", "/api/me/guild/hunts/$slot")
@@ -80,6 +103,9 @@ class ApiClient(private val session: Session) {
 
     /** 개발용: 친구 봇 4명 (서버 game.dev-tools.enabled=true 일 때만) */
     suspend fun devFriendBots(): JSONObject = obj("POST", "/api/dev/friend-bots")
+
+    /** 개발용: 레이드 주 1회 제한 초기화 */
+    suspend fun devRaidReset(): JSONObject = obj("POST", "/api/dev/raid-reset")
 
     // ── 레이드 ──
     suspend fun raid(): JSONObject = obj("GET", "/api/me/raid")

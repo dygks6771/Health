@@ -35,6 +35,7 @@ data class ItemInfo(
     val subValue: Int,
     val enhance: Int,
     val equipped: Boolean,
+    val listed: Boolean,
     val sellPrice: Long,
     val nextEnhanceRate: Int?,
     val nextEnhanceStones: Int?,
@@ -60,6 +61,7 @@ data class ItemInfo(
             subValue = j.getInt("subValue"),
             enhance = j.getInt("enhance"),
             equipped = j.getBoolean("equipped"),
+            listed = j.optBoolean("listed", false),
             sellPrice = j.getLong("sellPrice"),
             nextEnhanceRate = j.intOrNull("nextEnhanceRate"),
             nextEnhanceStones = j.intOrNull("nextEnhanceStones"),
@@ -285,6 +287,7 @@ data class RaidInfo(
     val friends: List<HeroSummary>,
     val bestGrade: String?,
     val bestDamage: Long?,
+    val remainingThisWeek: Int,
 ) {
     companion object {
         fun from(j: JSONObject) = RaidInfo(
@@ -304,6 +307,7 @@ data class RaidInfo(
             friends = j.getJSONArray("friends").mapObjects(HeroSummary::from),
             bestGrade = j.stringOrNull("bestGrade"),
             bestDamage = j.longOrNull("bestDamage"),
+            remainingThisWeek = j.optInt("remainingThisWeek", 1),
         )
     }
 }
@@ -344,5 +348,76 @@ data class RaidResult(
             item = if (j.isNull("item")) null else ItemInfo.from(j.getJSONObject("item")),
             hero = HeroInfo.from(j.getJSONObject("hero")),
         )
+    }
+}
+
+data class ShopOffer(val category: String, val name: String, val slots: List<String>, val price: Long)
+
+data class ShopInfo(val tier: Int, val regionName: String, val offers: List<ShopOffer>, val chances: List<Pair<String, Double>>) {
+    companion object {
+        fun from(j: JSONObject) = ShopInfo(
+            tier = j.getInt("tier"),
+            regionName = j.getString("regionName"),
+            offers = j.getJSONArray("offers").mapObjects {
+                ShopOffer(it.getString("category"), it.getString("name"), it.getJSONArray("slots").strings(), it.getLong("price"))
+            },
+            chances = j.getJSONArray("chances").mapObjects { it.getString("gradeName") to it.getDouble("percent") },
+        )
+    }
+}
+
+data class RankingEntry(
+    val rank: Int,
+    val heroId: Long,
+    val name: String,
+    val job: String,
+    val jobName: String,
+    val appearance: Int,
+    val level: Int,
+    val power: Int,
+    val score: Long,
+) {
+    companion object {
+        fun from(j: JSONObject) = RankingEntry(
+            j.getInt("rank"), j.getLong("heroId"), j.getString("name"), j.getString("job"), j.getString("jobName"),
+            j.getInt("appearance"), j.getInt("level"), j.getInt("power"), j.getLong("score"),
+        )
+    }
+}
+
+data class RankingInfo(val formula: String, val totalHeroes: Int, val entries: List<RankingEntry>, val me: RankingEntry?) {
+    companion object {
+        fun from(j: JSONObject) = RankingInfo(
+            formula = j.getString("formula"),
+            totalHeroes = j.getInt("totalHeroes"),
+            entries = j.getJSONArray("entries").mapObjects(RankingEntry::from),
+            me = if (j.isNull("me")) null else RankingEntry.from(j.getJSONObject("me")),
+        )
+    }
+}
+
+data class Listing(
+    val id: Long,
+    val item: ItemInfo,
+    val price: Long,
+    val sellerName: String,
+    val mine: Boolean,
+    val status: String,
+    val buyerName: String?,
+    val sellerReceives: Long,
+) {
+    companion object {
+        fun from(j: JSONObject) = Listing(
+            id = j.getLong("id"),
+            item = ItemInfo.from(j.getJSONObject("item")),
+            price = j.getLong("price"),
+            sellerName = j.getString("sellerName"),
+            mine = j.getBoolean("mine"),
+            status = j.getString("status"),
+            buyerName = j.stringOrNull("buyerName"),
+            sellerReceives = j.getLong("sellerReceives"),
+        )
+
+        fun listFrom(a: JSONArray): List<Listing> = a.mapObjects(::from)
     }
 }

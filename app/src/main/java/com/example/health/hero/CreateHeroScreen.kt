@@ -36,6 +36,9 @@ import com.example.health.ui.fantasy.GoldButton
 import com.example.health.ui.fantasy.Panel
 import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.fantasy.rememberActions
+import com.example.health.ui.fantasy.GhostButton
+import com.example.health.ui.sprites.HeroAvatar
+import com.example.health.ui.theme.Crimson
 import com.example.health.ui.theme.Gold
 import com.example.health.ui.theme.GoldDim
 import com.example.health.ui.theme.Parchment
@@ -49,6 +52,7 @@ fun CreateHeroScreen(api: ApiClient, onCreated: (JSONObject) -> Unit, onLogout: 
     var appearance by remember { mutableIntStateOf(0) }
     var job by remember { mutableStateOf<String?>(null) }
     var name by remember { mutableStateOf("") }
+    var nameCheck by remember { mutableStateOf<String?>(null) }
     val actions = rememberActions()
 
     LaunchedEffect(Unit) {
@@ -88,7 +92,7 @@ fun CreateHeroScreen(api: ApiClient, onCreated: (JSONObject) -> Unit, onLogout: 
                                 .padding(8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text(Portraits.appearance(index), fontSize = 40.sp)
+                            HeroAvatar(job ?: "WARRIOR", index, 64.dp)
                             Text(label, color = if (selected) Gold else Parchment, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
                         }
                     }
@@ -108,7 +112,7 @@ fun CreateHeroScreen(api: ApiClient, onCreated: (JSONObject) -> Unit, onLogout: 
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(Portraits.job(j.job), fontSize = 30.sp)
+                    HeroAvatar(j.job, appearance, 52.dp)
                     Column(modifier = Modifier.weight(1f)) {
                         Text("${j.name}  ·  ${j.role}", fontWeight = FontWeight.Bold, color = if (selected) Gold else Parchment)
                         Text(j.description, style = MaterialTheme.typography.bodySmall, color = ParchmentDim)
@@ -125,11 +129,28 @@ fun CreateHeroScreen(api: ApiClient, onCreated: (JSONObject) -> Unit, onLogout: 
         Panel(title = "3. 이름") {
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it.take(12) },
+                onValueChange = {
+                    name = it.take(12)
+                    nameCheck = null
+                },
                 label = { Text("영웅 이름 (한글·영문·숫자 2~12자)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GhostButton(
+                    "중복 확인",
+                    onClick = {
+                        actions.run {
+                            val json = api.nameAvailable(name)
+                            nameCheck = if (json.getBoolean("available")) "✓ 사용할 수 있는 이름입니다" else "✗ " + json.optString("reason")
+                            null
+                        }
+                    },
+                    enabled = !actions.busy && name.trim().length >= 2,
+                )
+                nameCheck?.let { Text(it, color = if (it.startsWith("✓")) Gold else Crimson, style = MaterialTheme.typography.bodySmall) }
+            }
             ActionFeedback(actions)
             GoldButton(
                 "모험 시작",

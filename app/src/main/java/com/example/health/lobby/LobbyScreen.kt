@@ -1,6 +1,13 @@
 package com.example.health.lobby
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
+import com.example.health.ui.fantasy.gradeColor
+import com.example.health.ui.sprites.HeroAvatar
+import com.example.health.ui.sprites.ItemIcon
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -64,9 +71,12 @@ private data class MenuItem(val icon: String, val title: String, val subtitle: S
 private val menu = listOf(
     MenuItem("🗺️", "모험", "10개 지역 · 던전", Screen.WORLD),
     MenuItem("📜", "모험자 길드", "오늘의 토벌 의뢰", Screen.GUILD),
-    MenuItem("🐉", "레이드", "친구와 마룡 토벌", Screen.RAID),
+    MenuItem("🐉", "레이드", "주 1회 · 마룡 토벌", Screen.RAID),
+    MenuItem("🏪", "상점", "장비 뽑기", Screen.SHOP),
+    MenuItem("⚖️", "경매장", "유저 간 거래", Screen.AUCTION),
     MenuItem("⚒️", "대장간", "장비 강화", Screen.SMITH),
     MenuItem("🎒", "영웅 · 가방", "능력치 · 장비", Screen.BAG),
+    MenuItem("🏆", "랭킹", "전체 모험가 순위", Screen.RANKING),
     MenuItem("👥", "친구", "동료 모집", Screen.FRIENDS),
     MenuItem("⚙️", "설정", "서버 · 테스트 · 로그아웃", Screen.SETTINGS),
 )
@@ -126,45 +136,115 @@ fun LobbyScreen(
 
     LaunchedEffect(resumeKey) { syncNow() }
 
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            ResourceChip("💰", "%,d".format(hero.gold))
-            ResourceChip("⚡", "${hero.stamina}/${hero.maxStamina}")
-            ResourceChip("💎", "${hero.enhanceStones}")
-        }
+    var menuOpen by remember { mutableStateOf(false) }
 
-        HeroPanel(hero)
-
-        if (needPermission) {
-            Panel(title = "운동 기록 권한 필요", highlight = true) {
-                Text("러닝 거리를 경험치로 바꾸려면 Health Connect 의 운동·거리 읽기를 허용해 주세요.", color = Parchment)
-                GoldButton("권한 허용하기", onClick = { permissionLauncher.launch(reader.requestPermissions) })
-            }
-        }
-        reward?.let { RewardPanel(it) }
-
-        menu.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                row.forEach { item -> MenuTile(item, Modifier.weight(1f)) { onNavigate(item.screen) } }
-                if (row.size == 1) Column(modifier = Modifier.weight(1f)) {}
-            }
-        }
-
-        syncError?.let { Text("⚠ $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                if (syncing) "러닝 기록 동기화 중..." else "마지막 동기화: ${formatTime(lastSyncAt)}",
-                color = ParchmentDim,
-                style = MaterialTheme.typography.bodySmall,
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                ResourceChip("💰", "%,d".format(hero.gold))
+                ResourceChip("⚡", "${hero.stamina}/${hero.maxStamina}")
+                ResourceChip("💎", "${hero.enhanceStones}")
+            }
+
+            HeroPanel(hero)
+            EquipmentPanel(hero)
+
+            if (needPermission) {
+                Panel(title = "운동 기록 권한 필요", highlight = true) {
+                    Text("러닝 거리를 경험치로 바꾸려면 Health Connect 의 운동·거리 읽기를 허용해 주세요.", color = Parchment)
+                    GoldButton("권한 허용하기", onClick = { permissionLauncher.launch(reader.requestPermissions) })
+                }
+            }
+            reward?.let { RewardPanel(it) }
+
+            syncError?.let { Text("⚠ $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (syncing) "러닝 기록 동기화 중..." else "마지막 동기화: ${formatTime(lastSyncAt)}",
+                    color = ParchmentDim,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                GhostButton("동기화", onClick = { scope.launch { syncNow() } }, enabled = !syncing)
+            }
+            // 아래 메뉴 버튼에 가리지 않도록 여백
+            Text("", modifier = Modifier.padding(bottom = 56.dp))
+        }
+
+        GoldButton(
+            "☰  메뉴",
+            onClick = { menuOpen = true },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).fillMaxWidth(0.6f),
+        )
+
+        if (menuOpen) {
+            MenuOverlay(
+                onSelect = {
+                    menuOpen = false
+                    onNavigate(it)
+                },
+                onClose = { menuOpen = false },
             )
-            GhostButton("동기화", onClick = { scope.launch { syncNow() } }, enabled = !syncing)
+        }
+    }
+}
+
+/** 메뉴 창: 화면을 어둡게 덮고 컨텐츠 목록 표시 */
+@Composable
+private fun MenuOverlay(onSelect: (Screen) -> Unit, onClose: () -> Unit) {
+    BackHandler(onBack = onClose)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.75f))
+            .clickable(onClick = onClose),
+        contentAlignment = Alignment.Center,
+    ) {
+        Panel(
+            title = "모험가의 수첩",
+            highlight = true,
+            // 패널 안을 눌러도 메뉴가 닫히지 않도록 클릭을 여기서 소비
+            modifier = Modifier.padding(20.dp).clickable(onClick = {}),
+        ) {
+            menu.chunked(2).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    row.forEach { item -> MenuTile(item, Modifier.weight(1f)) { onSelect(item.screen) } }
+                    if (row.size == 1) Column(modifier = Modifier.weight(1f)) {}
+                }
+            }
+            GhostButton("닫기", onClick = onClose, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/** 장착 장비 4칸 */
+@Composable
+private fun EquipmentPanel(hero: HeroInfo) {
+    Panel(title = "장착 장비") {
+        listOf("WEAPON" to "무기", "ARMOR" to "갑옷", "BOOTS" to "장화", "ACCESSORY" to "목걸이").forEach { (slot, label) ->
+            val item = hero.equipment.firstOrNull { it.slot == slot }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ItemIcon(item, 40.dp, emptySlot = slot)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        item?.let { "[${it.gradeName}] ${it.displayName}" } ?: "$label — 비어 있음",
+                        color = item?.let { gradeColor(it.gradeName) } ?: ParchmentDim,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (item != null) Text(item.statText, color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            hero.stats.forEach { s ->
+                Text("${s.name} ${s.total}", color = Parchment, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
@@ -174,7 +254,7 @@ private fun HeroPanel(hero: HeroInfo) {
     Panel(highlight = true) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(Portraits.appearance(hero.appearance), fontSize = 72.sp)
+                HeroAvatar(hero.job, hero.appearance, 110.dp)
                 Text("${Portraits.job(hero.job)} ${hero.jobName}", color = Gold, style = MaterialTheme.typography.labelLarge)
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {

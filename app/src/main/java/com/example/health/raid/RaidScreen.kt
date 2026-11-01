@@ -38,6 +38,10 @@ import com.example.health.ui.fantasy.Panel
 import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.fantasy.gradeColor
 import com.example.health.ui.fantasy.rememberActions
+import com.example.health.ui.fantasy.GhostButton
+import com.example.health.ui.sprites.DragonSprite
+import com.example.health.ui.sprites.HeroAvatar
+import com.example.health.ui.sprites.PixelSprite
 import com.example.health.ui.theme.Crimson
 import com.example.health.ui.theme.Gold
 import com.example.health.ui.theme.GoldBright
@@ -81,8 +85,20 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
         ActionFeedback(actions)
         val raid = info ?: return@Column
 
-        Panel(title = "${Portraits.raidStage(1)} ${raid.bossName}", highlight = true) {
-            Text("파티 ${raid.partySize}명 · ${raid.turns}턴 · 행동력 ${raid.staminaCost}", color = Parchment)
+        Panel(title = raid.bossName, highlight = true) {
+            val stage = result?.finalStage ?: 1
+            PixelSprite(DragonSprite.stage(stage), Modifier.align(Alignment.CenterHorizontally), size = (110 + stage * 20).dp)
+            Text(
+                if (result == null) "깊은 잠에서 깨어난 마룡이 모험가들을 기다린다..." else "${stage}단계 ${result?.finalStageName}",
+                color = GoldBright,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+            Text("파티 ${raid.partySize}명 · ${raid.turns}턴 · 행동력 ${raid.staminaCost} · 주 1회", color = Parchment)
+            Text(
+                if (raid.remainingThisWeek > 0) "이번 주 도전 가능" else "이번 주 도전 완료 — 월요일 0시에 초기화",
+                color = if (raid.remainingThisWeek > 0) Gold else Crimson,
+                fontWeight = FontWeight.Bold,
+            )
             raid.stages.forEach { s ->
                 Text(
                     "${s.stage}단계 ${s.name} — 누적 %,d 부터 · 받는 피해 %d%%".format(s.threshold, (s.damageRate * 100).toInt()),
@@ -135,7 +151,7 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(if (checked) "☑" else "☐", color = Gold)
-                    Text(Portraits.appearance(f.appearance), fontSize = 22.sp)
+                    HeroAvatar(f.job, f.appearance, 36.dp)
                     Text("${f.name} · Lv.${f.level} ${f.jobName}", color = Parchment, modifier = Modifier.weight(1f))
                     Text("${f.power}", color = Gold)
                 }
@@ -152,9 +168,15 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
                         null
                     }
                 },
-                enabled = !actions.busy && selected.size == raid.partySize - 1 && hero.stamina >= raid.staminaCost,
+                enabled = !actions.busy && selected.size == raid.partySize - 1 &&
+                    hero.stamina >= raid.staminaCost && raid.remainingThisWeek > 0,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        Panel(title = "🛠 개발용") {
+            Text("테스트를 위해 이번 주 레이드 제한을 초기화합니다 (서버 개발 모드에서만)", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+            GhostButton("주간 제한 초기화", onClick = { actions.run { api.devRaidReset(); load(); "초기화했습니다" } }, enabled = !actions.busy)
         }
     }
 }
@@ -164,6 +186,7 @@ private fun RaidResultPanel(r: RaidResult) {
     Panel(title = "전투 결과", highlight = true) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(r.grade, fontSize = 56.sp, color = raidGradeColor(r.grade), fontWeight = FontWeight.Black)
+            PixelSprite(DragonSprite.stage(r.finalStage), size = 56.dp)
             Column {
                 Text("총 데미지 %,d".format(r.totalDamage), color = GoldBright, style = MaterialTheme.typography.titleMedium)
                 Text("${Portraits.raidStage(r.finalStage)} 최종 형태: ${r.finalStage}단계 ${r.finalStageName}", color = Parchment)

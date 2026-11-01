@@ -34,6 +34,9 @@ import com.example.health.ui.fantasy.ResourceChip
 import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.fantasy.gradeColor
 import com.example.health.ui.fantasy.rememberActions
+import com.example.health.ui.sprites.ItemIcon
+import com.example.health.ui.sprites.NpcBanner
+import com.example.health.ui.sprites.NpcSprites
 import com.example.health.ui.theme.Crimson
 import com.example.health.ui.theme.Emerald
 import com.example.health.ui.theme.Gold
@@ -62,7 +65,7 @@ fun SmithScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ScreenHeader("대장간", onBack)
-        Text("\"좋은 쇠는 두드릴수록 강해지는 법이지. 다만 운도 따라야 하네.\" — 대장장이 브론", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+        NpcBanner(NpcSprites.blacksmith, "좋은 쇠는 두드릴수록 강해지는 법이지. 다만 운도 따라야 하네. 실패해도 단계는 지켜 주지!")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ResourceChip("💎", "강화석 ${hero.enhanceStones}")
             ResourceChip("💰", "%,d".format(hero.gold))
@@ -73,8 +76,13 @@ fun SmithScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
             if (selected == null) {
                 Text("아래 목록에서 강화할 장비를 고르세요", color = ParchmentDim)
             } else {
-                Text("[${selected.gradeName}] ${selected.displayName}", color = gradeColor(selected.gradeName), style = MaterialTheme.typography.titleMedium)
-                Text("${selected.slotName} · ${selected.statText}", color = Parchment)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ItemIcon(selected, 56.dp)
+                    Column {
+                        Text("[${selected.gradeName}] ${selected.displayName}", color = gradeColor(selected.gradeName), style = MaterialTheme.typography.titleMedium)
+                        Text("${selected.slotName} · ${selected.statText}", color = Parchment)
+                    }
+                }
                 val rate = selected.nextEnhanceRate
                 val stones = selected.nextEnhanceStones
                 val gold = selected.nextEnhanceGold
@@ -112,10 +120,12 @@ fun SmithScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                         .clickable { selectedId = item.id }
                         .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    ItemIcon(item, 36.dp)
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            (if (item.equipped) "[장착] " else "") + item.displayName,
+                            (if (item.equipped) "[장착] " else if (item.listed) "[경매 중] " else "") + item.displayName,
                             color = gradeColor(item.gradeName),
                             fontWeight = FontWeight.SemiBold,
                         )

@@ -29,6 +29,9 @@ import com.example.health.ui.fantasy.Panel
 import com.example.health.ui.fantasy.ResourceChip
 import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.fantasy.rememberActions
+import com.example.health.ui.sprites.MonsterAvatar
+import com.example.health.ui.sprites.NpcBanner
+import com.example.health.ui.sprites.NpcSprites
 import com.example.health.ui.theme.Crimson
 import com.example.health.ui.theme.Emerald
 import com.example.health.ui.theme.Gold
@@ -55,7 +58,7 @@ fun GuildScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ScreenHeader("모험자 길드", onBack)
-        Text("\"오늘의 토벌 의뢰입니다. 의뢰는 매일 자정에 새로 붙습니다.\" — 길드 접수원", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+        NpcBanner(NpcSprites.receptionist, "${hero.name} 님, 오늘의 토벌 의뢰예요! 의뢰는 매일 자정에 새로 붙는답니다.")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ResourceChip("⚔", "전투력 ${board?.power ?: hero.power}")
             ResourceChip("⚡", "${hero.stamina}")
@@ -84,8 +87,11 @@ private fun HuntCard(hunt: HuntInfo, enabled: Boolean, onHunt: () -> Unit) {
     }
     Panel(highlight = hunt.difficulty == "HARD" && !hunt.cleared) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("[${hunt.difficultyName}]", color = color, fontWeight = FontWeight.Bold)
-            Text("${hunt.monster} 토벌", style = MaterialTheme.typography.titleMedium, color = GoldBright, modifier = Modifier.weight(1f))
+            MonsterAvatar(hunt.monster, 48.dp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("[${hunt.difficultyName}]", color = color, fontWeight = FontWeight.Bold)
+                Text("${hunt.monster} 토벌", style = MaterialTheme.typography.titleMedium, color = GoldBright)
+            }
             if (hunt.cleared) Text("완료 ✓", color = Emerald, fontWeight = FontWeight.Bold)
         }
         Text("출몰 지역: ${hunt.regionName} · 적 레벨 ${hunt.targetLevel}", color = Parchment, style = MaterialTheme.typography.bodySmall)

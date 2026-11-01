@@ -31,6 +31,8 @@ import com.example.health.ui.fantasy.Panel
 import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.fantasy.gradeColor
 import com.example.health.ui.fantasy.rememberActions
+import com.example.health.ui.sprites.HeroAvatar
+import com.example.health.ui.sprites.ItemIcon
 import com.example.health.ui.theme.Gold
 import com.example.health.ui.theme.GoldBright
 import com.example.health.ui.theme.Parchment
@@ -67,7 +69,7 @@ fun BagScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit, 
 
         Panel(highlight = true) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(Portraits.appearance(hero.appearance), fontSize = 48.sp)
+                HeroAvatar(hero.job, hero.appearance, 72.dp)
                 Column {
                     Text(hero.name, style = MaterialTheme.typography.titleLarge, color = GoldBright)
                     Text("Lv.${hero.level} ${Portraits.job(hero.job)} ${hero.jobName} (${hero.jobRole})", color = Parchment)
@@ -99,7 +101,8 @@ fun BagScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit, 
         Panel(title = "장착 장비") {
             slotOrder.forEach { (slot, label) ->
                 val item = hero.equipment.firstOrNull { it.slot == slot }
-                Row(modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ItemIcon(item, 36.dp, emptySlot = slot)
                     Text(label, color = ParchmentDim, modifier = Modifier.weight(0.25f))
                     Text(
                         item?.let { "${it.displayName}  ${it.statText}" } ?: "— 비어 있음",
@@ -115,14 +118,21 @@ fun BagScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit, 
         Panel(title = "가방 (${items.size})") {
             items.forEach { item ->
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        (if (item.equipped) "[장착] " else "") + "[${item.gradeName}] ${item.displayName}",
-                        color = gradeColor(item.gradeName),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text("${item.slotName} · 티어 ${item.tier} · ${item.statText}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ItemIcon(item, 40.dp)
+                        Column {
+                            Text(
+                                (if (item.equipped) "[장착] " else if (item.listed) "[경매 중] " else "") + "[${item.gradeName}] ${item.displayName}",
+                                color = gradeColor(item.gradeName),
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text("${item.slotName} · 티어 ${item.tier} · ${item.statText}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (item.equipped) {
+                        if (item.listed) {
+                            Text("경매장에서 판매 중 (경매장 → 판매에서 취소)", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                        } else if (item.equipped) {
                             GhostButton("해제", onClick = { actions.run { applyResponse(api.unequip(item.id)); null } }, enabled = !actions.busy)
                         } else {
                             GhostButton("장착", onClick = { actions.run { applyResponse(api.equip(item.id)); null } }, enabled = !actions.busy)

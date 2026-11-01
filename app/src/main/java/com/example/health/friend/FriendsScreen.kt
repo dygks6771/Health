@@ -32,6 +32,7 @@ import com.example.health.ui.fantasy.GoldButton
 import com.example.health.ui.fantasy.Panel
 import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.fantasy.rememberActions
+import com.example.health.ui.sprites.HeroAvatar
 import com.example.health.ui.theme.Gold
 import com.example.health.ui.theme.Parchment
 import com.example.health.ui.theme.ParchmentDim
@@ -126,7 +127,7 @@ private fun FriendRow(entry: FriendEntry, actions: @Composable () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(Portraits.appearance(h.appearance), fontSize = 26.sp)
+        HeroAvatar(h.job, h.appearance, 40.dp)
         Column(modifier = Modifier.weight(1f)) {
             Text(h.name, color = Gold)
             Text("Lv.${h.level} ${Portraits.job(h.job)} ${h.jobName} · 전투력 ${h.power}", color = Parchment, style = MaterialTheme.typography.bodySmall)
