@@ -119,6 +119,8 @@ fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                             r.item?.let { "획득: [${it.gradeName}] ${it.displayName} (${it.statText})" } ?: "이번에는 장비가 나오지 않았습니다",
                         ),
                         enemySize = 170.dp,
+                        heroMaxHp = hero.power * 2L,
+                        heroLoss = (region.minTotalStats.toFloat() / hero.totalStats.coerceAtLeast(1) * 0.75f).coerceIn(0.15f, 0.9f),
                         seed = region.tier,
                     )
                     load()

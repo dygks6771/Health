@@ -38,6 +38,8 @@ DB 접속 정보는 환경변수로 바꿀 수 있음: `DB_URL`, `DB_USERNAME`, 
 | POST / GET | `/api/me/runs` | 러닝 기록 동기화 → 보상 / 최근 20건과 보상 제외 이유 |
 | GET | `/api/me/items` | 가방 |
 | POST | `/api/me/items/{id}/equip` · `unequip` · `sell` | 장착 / 해제 / 판매 |
+| POST | `/api/me/items/sell-bulk?maxGrade=COMMON` | 해당 등급 이하 미장착 장비 일괄 판매 |
+| POST | `/api/me/steps` | 날짜별 걸음수 → 행동력 `{"days":[{"date","steps"}]}` |
 | POST | `/api/me/smith/{id}/enhance` | 대장간 강화 |
 | GET / POST | `/api/me/guild/hunts` · `/{slot}` | 모험자 길드 오늘의 토벌 5개 / 토벌 |
 | GET / POST | `/api/me/world` · `/{1~10}/dungeon` | 10개 지역·던전 / 던전 공략 |
@@ -52,7 +54,9 @@ DB 접속 정보는 환경변수로 바꿀 수 있음: `DB_URL`, `DB_USERNAME`, 
 
 ## 게임 규칙 (`game/` 패키지)
 
-**러닝 보상** — 1km 당 EXP 50 · 골드 20 · 행동력 10 (최대 300). 하루 20km 까지, 시속 25km 초과 기록은 제외
+**러닝 보상** — 1km 당 EXP 50 · 골드 20, **상한 없음** (평균 시속 25km 초과 기록만 제외)
+
+**걸음 보상** — 100보 = 행동력 1, 하루 최대 150 (15,000보), 보유 최대 300. `POST /api/me/steps`
 
 **영웅** — 직업 5종(기사·전사·궁수·마법사·성직자). 생성 시 주 능력치 +3, 보조 +2.
 레벨업마다 포인트 3 + 주 능력치 +1. 전투력 = 능력치 합 × 3 + 레벨 × 10

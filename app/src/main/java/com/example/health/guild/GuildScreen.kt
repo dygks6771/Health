@@ -87,6 +87,9 @@ fun GuildScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                         hits = if (hunt.difficulty == "HARD") 5 else 4,
                         resultTitle = "🏆 토벌 성공!",
                         resultLines = listOf("${hunt.monster} 토벌 완료", "골드 +${json.getInt("rewardGold")}"),
+                        heroMaxHp = hero.power * 2L,
+                        // 권장 전투력이 내 전투력에 가까울수록 많이 맞음 (도전 의뢰는 아슬아슬하게)
+                        heroLoss = (hunt.requiredPower.toFloat() / hero.power.coerceAtLeast(1) * 0.7f).coerceIn(0.1f, 0.9f),
                         seed = hunt.slot,
                     )
                     load()

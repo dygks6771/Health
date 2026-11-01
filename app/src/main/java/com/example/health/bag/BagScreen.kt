@@ -33,6 +33,8 @@ import com.example.health.ui.fantasy.gradeColor
 import com.example.health.ui.fantasy.rememberActions
 import com.example.health.ui.sprites.HeroAvatar
 import com.example.health.ui.sprites.ItemIcon
+import com.example.health.ui.theme.Crimson
+import com.example.health.ui.theme.Emerald
 import com.example.health.ui.theme.Gold
 import com.example.health.ui.theme.GoldBright
 import com.example.health.ui.theme.Parchment
@@ -93,6 +95,13 @@ fun BagScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit, 
                         onClick = { actions.run { onHeroJson(api.allocateStat(s.code)); null } },
                         enabled = !actions.busy && hero.statPoints > 0,
                     )
+                    if (hero.statPoints >= 5) {
+                        GhostButton(
+                            "+5",
+                            onClick = { actions.run { onHeroJson(api.allocateStat(s.code, 5)); null } },
+                            enabled = !actions.busy,
+                        )
+                    }
                 }
             }
             Text("레벨업마다 포인트 3 + 직업 주 능력치 +1", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
@@ -116,6 +125,22 @@ fun BagScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit, 
 
         ActionFeedback(actions)
         Panel(title = "가방 (${items.size})") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("COMMON" to "일반 일괄 판매", "UNCOMMON" to "고급 이하 일괄 판매").forEach { (grade, label) ->
+                    GhostButton(
+                        label,
+                        onClick = {
+                            actions.run {
+                                val json = api.sellBulk(grade)
+                                applyResponse(json.getJSONObject("inventory"))
+                                "${json.getInt("soldCount")}개 판매 · 골드 +${json.getLong("gold")}"
+                            }
+                        },
+                        enabled = !actions.busy,
+                    )
+                }
+            }
+            Text("장착 중·경매 중인 장비는 팔리지 않습니다", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
             items.forEach { item ->
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -127,6 +152,24 @@ fun BagScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit, 
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text("${item.slotName} · 티어 ${item.tier} · ${item.statText}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                            if (!item.equipped) {
+                                // 같은 부위 장착 장비와 주 능력치 비교
+                                val current = hero.equipment.firstOrNull { it.slot == item.slot }
+                                val diff = item.value - (current?.value ?: 0)
+                                Text(
+                                    when {
+                                        diff > 0 -> "▲ 장착 장비보다 ${item.statName} +$diff"
+                                        diff < 0 -> "▼ 장착 장비보다 ${item.statName} $diff"
+                                        else -> "= 장착 장비와 같음"
+                                    },
+                                    color = when {
+                                        diff > 0 -> Emerald
+                                        diff < 0 -> Crimson
+                                        else -> ParchmentDim
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -95,6 +95,9 @@ data class HeroInfo(
     /** 오늘 실제 보상받은 거리 (속도 초과·하루 상한 제외) */
     val todayRewardKm: Double,
     val weekKm: Double,
+    val todaySteps: Long,
+    val todayStepStamina: Int,
+    val dailyStepStaminaCap: Int,
 ) {
     val expProgress: Float get() = if (expToNextLevel <= 0) 0f else expInLevel.toFloat() / expToNextLevel
     val staminaProgress: Float get() = if (maxStamina <= 0) 0f else stamina.toFloat() / maxStamina
@@ -122,6 +125,9 @@ data class HeroInfo(
             todayKm = j.getDouble("todayKm"),
             todayRewardKm = j.optDouble("todayRewardKm", j.getDouble("todayKm")),
             weekKm = j.getDouble("weekKm"),
+            todaySteps = j.optLong("todaySteps", 0),
+            todayStepStamina = j.optInt("todayStepStamina", 0),
+            dailyStepStaminaCap = j.optInt("dailyStepStaminaCap", 150),
         )
     }
 }
@@ -192,7 +198,6 @@ data class RunReward(
     val countedKm: Double,
     val expGained: Long,
     val goldGained: Long,
-    val staminaGained: Int,
     val levelBefore: Int,
     val levelAfter: Int,
     val statPointsGained: Int,
@@ -206,7 +211,6 @@ data class RunReward(
             countedKm = j.getDouble("countedKm"),
             expGained = j.getLong("expGained"),
             goldGained = j.getLong("goldGained"),
-            staminaGained = j.getInt("staminaGained"),
             levelBefore = j.getInt("levelBefore"),
             levelAfter = j.getInt("levelAfter"),
             statPointsGained = j.getInt("statPointsGained"),

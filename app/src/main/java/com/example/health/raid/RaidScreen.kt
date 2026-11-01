@@ -201,16 +201,38 @@ private fun raidBattle(r: RaidResult, info: RaidInfo): BattleSpec {
         return 1f - ((total - current).toFloat() / (next - current).coerceAtLeast(1L)).coerceIn(0f, 1f)
     }
     var previousStage = 1
-    val rounds = r.turns.map { t ->
+    // 파티 체력은 연출용: 진화 단계가 높을수록 마룡의 브레스가 아프다 (전멸하지는 않음)
+    val partyMaxHp = 10_000L
+    var partyHp = partyMaxHp
+    val breathRate = listOf(0.03, 0.05, 0.07, 0.09)
+    val rounds = r.turns.flatMap { t ->
         val evolved = t.stage != previousStage
         previousStage = t.stage
-        BattleRound(
+        val hpNow = hpAfter(t.totalDamage, t.stage)
+        val attack = BattleRound(
             attacker = (t.turn - 1) % party.size.coerceAtLeast(1),
             damage = t.damage,
-            enemyHpAfter = hpAfter(t.totalDamage, t.stage),
+            enemyHpAfter = hpNow,
             enemySprite = if (evolved) DragonSprite.stage(t.stage) else null,
             caption = if (evolved) "⚠ 마룡이 진화했다! ${t.stage}단계 ${t.stageName}" else "${t.turn}턴 · 누적 %,d".format(t.totalDamage),
         )
+        if (t.turn % 2 == 0) {
+            val breath = (partyMaxHp * breathRate[(t.stage - 1).coerceIn(0, 3)]).toLong().coerceAtMost(partyHp - 1)
+            partyHp -= breath
+            listOf(
+                attack,
+                BattleRound(
+                    attacker = 0,
+                    damage = breath,
+                    enemyHpAfter = hpNow,
+                    enemyAttack = true,
+                    heroHpAfter = partyHp.toFloat() / partyMaxHp,
+                    caption = "🔥 ${t.stageName}의 브레스!",
+                ),
+            )
+        } else {
+            listOf(attack)
+        }
     }
     return BattleSpec(
         title = "레이드: ${info.bossName}",

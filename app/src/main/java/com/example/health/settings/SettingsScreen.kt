@@ -89,12 +89,13 @@ fun SettingsScreen(
 
         Panel(title = "러닝 기록") {
             GhostButton(
-                "지금 러닝 동기화",
+                "지금 러닝·걸음 동기화",
                 onClick = {
                     actions.run {
                         val r = syncer.sync()
                         session.cachedHeroJson?.let { onHeroJson(JSONObject(it)) }
-                        "러닝 ${r.readRuns}건 읽음 · 새로 반영 ${r.reward.newRuns}건 · EXP +${r.reward.expGained}" +
+                        "러닝 ${r.readRuns}건 읽음 · 새로 반영 ${r.reward.newRuns}건 · EXP +${r.reward.expGained}\n" +
+                            "걸음 → 행동력 +${r.staminaGained}" +
                             r.reward.rejected.joinToString("") { "\n보상 제외: $it" }
                     }
                 },
@@ -118,6 +119,25 @@ fun SettingsScreen(
             )
         }
 
+        Panel(title = "🛠 테스트 걸음수") {
+            Text("행동력 확인용: 방금 3,000보 걸은 것으로 기록 (행동력 +30)", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+            GhostButton(
+                "[테스트] 걸음 3,000보 기록",
+                onClick = {
+                    actions.run {
+                        if (!reader.hasWritePermissions()) {
+                            writePermissionLauncher.launch(reader.writePermissions)
+                            "걸음수 쓰기 권한을 허용한 뒤 다시 눌러 주세요"
+                        } else {
+                            reader.insertTestSteps(3_000)
+                            "3,000보를 기록했습니다. '지금 러닝 동기화'를 누르세요"
+                        }
+                    }
+                },
+                enabled = !actions.busy,
+            )
+        }
+
         Panel(title = "최근 러닝 기록과 보상") {
             GhostButton("불러오기", onClick = { actions.run { history = RunHistory.listFrom(api.runHistory()); null } }, enabled = !actions.busy)
             history.forEach { r ->
@@ -129,7 +149,7 @@ fun SettingsScreen(
                 r.rejectedReason?.let { Text("   ⚠ $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
             }
             Text(
-                "보상 규칙: 1km = EXP 50 · 하루 20km 까지 · 평균 시속 25km 초과 기록은 제외 (시간대가 겹친 기록은 거리가 합쳐져 초과될 수 있음)",
+                "보상 규칙: 러닝 1km = EXP 50 · 골드 20 (상한 없음, 평균 시속 25km 초과 기록만 제외) · 걸음 100보 = 행동력 1 (하루 150)",
                 color = ParchmentDim,
                 style = MaterialTheme.typography.bodySmall,
             )

@@ -6,6 +6,8 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.Record
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
@@ -13,6 +15,7 @@ import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.units.Length
 import java.time.Instant
 import java.time.LocalDate
+import java.time.Period
 import java.time.ZoneId
 
 /** Health Connect 러닝 기록 1건 */
@@ -27,14 +30,17 @@ data class RunRecord(
 )
 
 /**
- * 삼성헬스 등에서 Health Connect 로 들어온 러닝(운동 세션) 기록을 읽는다.
+ * 삼성헬스 등에서 Health Connect 로 들어온 러닝(운동 세션) 기록과 걸음수를 읽는다.
+ * 러닝 km → 경험치·골드, 걸음수 → 행동력.
  * 거리는 운동 세션 시간 동안 같은 앱이 기록한 거리(DistanceRecord)의 합계.
  */
 class RunReader(private val context: Context) {
 
+    /** 러닝(경험치) + 걸음수(행동력) 읽기 */
     val permissions = setOf(
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         HealthPermission.getReadPermission(DistanceRecord::class),
+        HealthPermission.getReadPermission(StepsRecord::class),
     )
 
     /** 처음 권한을 요청할 때 한 번에 묻는 권한들 (백그라운드 읽기는 지원 기기에서만 표시됨) */
@@ -44,6 +50,7 @@ class RunReader(private val context: Context) {
     val writePermissions = setOf(
         HealthPermission.getWritePermission(ExerciseSessionRecord::class),
         HealthPermission.getWritePermission(DistanceRecord::class),
+        HealthPermission.getWritePermission(StepsRecord::class),
     )
 
     private val client by lazy { HealthConnectClient.getOrCreate(context) }
@@ -92,6 +99,40 @@ class RunReader(private val context: Context) {
                 )
             }
             .sortedBy { it.startTime }
+    }
+
+    /** 최근 [days]일 날짜별 걸음수 (Health Connect 가 여러 기기 중복을 제거한 합계) */
+    suspend fun readDailySteps(days: Int = 7, zone: ZoneId = ZoneId.systemDefault()): List<Pair<LocalDate, Long>> {
+        val today = LocalDate.now(zone)
+        val start = today.minusDays(days - 1L)
+        val response = client.aggregateGroupByPeriod(
+            AggregateGroupByPeriodRequest(
+                metrics = setOf(StepsRecord.COUNT_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(start.atStartOfDay(), today.plusDays(1).atStartOfDay()),
+                timeRangeSlicer = Period.ofDays(1),
+            ),
+        )
+        val byDate = response.associate { it.startTime.toLocalDate() to (it.result[StepsRecord.COUNT_TOTAL] ?: 0L) }
+        return (0 until days).map { start.plusDays(it.toLong()) }.map { it to (byDate[it] ?: 0L) }
+    }
+
+    /** 개발용: 방금 [count] 걸음을 걸은 것으로 기록 */
+    suspend fun insertTestSteps(count: Long = 3_000) {
+        val end = Instant.now()
+        val start = end.minusSeconds(60)
+        val rules = ZoneId.systemDefault().rules
+        client.insertRecords(
+            listOf<Record>(
+                StepsRecord(
+                    startTime = start,
+                    startZoneOffset = rules.getOffset(start),
+                    endTime = end,
+                    endZoneOffset = rules.getOffset(end),
+                    count = count,
+                    metadata = Metadata.manualEntry(),
+                ),
+            ),
+        )
     }
 
     /**

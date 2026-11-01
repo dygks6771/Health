@@ -97,6 +97,7 @@ fun LobbyScreen(
     val scope = rememberCoroutineScope()
 
     var reward by remember { mutableStateOf<RunReward?>(null) }
+    var stepStamina by remember { mutableStateOf(0 to 0) }
     var needPermission by remember { mutableStateOf(false) }
     var syncing by remember { mutableStateOf(false) }
     var syncError by remember { mutableStateOf<String?>(null) }
@@ -119,6 +120,7 @@ fun LobbyScreen(
             val result = syncer.sync()
             session.cachedHeroJson?.let { onHeroJson(JSONObject(it)) }
             reward = result.reward.takeIf { it.newRuns > 0 }
+            stepStamina = result.staminaGained to result.staminaOverflow
             lastSyncAt = session.lastSyncAt
         } catch (e: CancellationException) {
             throw e
@@ -144,10 +146,25 @@ fun LobbyScreen(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 ResourceChip("💰", "%,d".format(hero.gold))
                 ResourceChip("⚡", "${hero.stamina}/${hero.maxStamina}")
                 ResourceChip("💎", "${hero.enhanceStones}")
+                Box(modifier = Modifier.weight(1f))
+                // 메뉴는 우측 상단에 작게
+                Text(
+                    "☰",
+                    color = Gold,
+                    fontSize = 22.sp,
+                    modifier = Modifier
+                        .border(1.dp, GoldDim, RoundedCornerShape(8.dp))
+                        .clickable { menuOpen = true }
+                        .padding(horizontal = 10.dp, vertical = 2.dp),
+                )
             }
 
             HeroPanel(hero)
@@ -155,11 +172,22 @@ fun LobbyScreen(
 
             if (needPermission) {
                 Panel(title = "운동 기록 권한 필요", highlight = true) {
-                    Text("러닝 거리를 경험치로 바꾸려면 Health Connect 의 운동·거리 읽기를 허용해 주세요.", color = Parchment)
+                    Text("러닝(경험치)과 걸음수(행동력)를 읽으려면 Health Connect 의 운동·거리·걸음수 읽기를 허용해 주세요.", color = Parchment)
                     GoldButton("권한 허용하기", onClick = { permissionLauncher.launch(reader.requestPermissions) })
                 }
             }
-            reward?.let { RewardPanel(it) }
+            if (reward != null || stepStamina.first > 0 || stepStamina.second > 0) {
+                RewardPanel(reward, stepStamina.first, stepStamina.second)
+            }
+            if (hero.stamina < 10) {
+                Panel(title = "💡 행동력이 부족해요") {
+                    Text(
+                        "걸으면 행동력이 찹니다 (100보 = 1, 하루 최대 ${hero.dailyStepStaminaCap}). 러닝은 경험치와 골드를 줍니다.",
+                        color = Parchment,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
 
             syncError?.let { Text("⚠ $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
             Row(
@@ -178,11 +206,7 @@ fun LobbyScreen(
             Text("", modifier = Modifier.padding(bottom = 84.dp))
         }
 
-        QuickBar(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            onNavigate = onNavigate,
-            onMenu = { menuOpen = true },
-        )
+        QuickBar(modifier = Modifier.align(Alignment.BottomCenter), onNavigate = onNavigate)
 
         if (menuOpen) {
             MenuOverlay(
@@ -196,9 +220,9 @@ fun LobbyScreen(
     }
 }
 
-/** 하단 바로가기: 모험 · 모험자 길드 · 레이드 + 전체 메뉴 */
+/** 하단 바로가기: 모험 · 모험자 길드 · 레이드 · 영웅 가방 (나머지는 우측 상단 ☰) */
 @Composable
-private fun QuickBar(modifier: Modifier, onNavigate: (Screen) -> Unit, onMenu: () -> Unit) {
+private fun QuickBar(modifier: Modifier, onNavigate: (Screen) -> Unit) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -210,6 +234,7 @@ private fun QuickBar(modifier: Modifier, onNavigate: (Screen) -> Unit, onMenu: (
             Triple("🗺️", "모험", Screen.WORLD),
             Triple("📜", "길드", Screen.GUILD),
             Triple("🐉", "레이드", Screen.RAID),
+            Triple("🎒", "영웅·가방", Screen.BAG),
         ).forEach { (icon, label, screen) ->
             Column(
                 modifier = Modifier
@@ -223,18 +248,6 @@ private fun QuickBar(modifier: Modifier, onNavigate: (Screen) -> Unit, onMenu: (
                 Text(icon, fontSize = 22.sp)
                 Text(label, color = GoldBright, style = MaterialTheme.typography.labelLarge)
             }
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .border(1.dp, GoldBright, RoundedCornerShape(10.dp))
-                .background(Gold, RoundedCornerShape(10.dp))
-                .clickable(onClick = onMenu)
-                .padding(vertical = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text("☰", fontSize = 22.sp, color = Color.Black)
-            Text("메뉴", color = Color.Black, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -305,7 +318,12 @@ private fun HeroPanel(hero: HeroInfo) {
                 Text(hero.name, style = MaterialTheme.typography.headlineSmall, color = GoldBright)
                 Text("Lv.${hero.level} · ${hero.jobRole}", color = Parchment, fontWeight = FontWeight.SemiBold)
                 Text("⚔ 전투력 %,d".format(hero.power), color = Gold, style = MaterialTheme.typography.titleMedium)
-                Text("🏃 오늘 보상 %.2fkm · 이번 주 %.1fkm".format(hero.todayRewardKm, hero.weekKm), color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                Text("🏃 오늘 %.2fkm · 이번 주 %.1fkm".format(hero.todayRewardKm, hero.weekKm), color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "👣 오늘 %,d보 · 행동력 +${hero.todayStepStamina}/${hero.dailyStepStaminaCap}".format(hero.todaySteps),
+                    color = ParchmentDim,
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 if (hero.todayKm - hero.todayRewardKm > 0.01) {
                     Text(
                         "⚠ 오늘 %.2fkm 중 %.2fkm 는 보상 제외 (설정 → 최근 러닝 기록)".format(hero.todayKm, hero.todayKm - hero.todayRewardKm),
@@ -317,7 +335,7 @@ private fun HeroPanel(hero: HeroInfo) {
         }
         Text("EXP ${hero.expInLevel} / ${hero.expToNextLevel}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
         FantasyBar(hero.expProgress, Mana)
-        Text("행동력 ${hero.stamina} / ${hero.maxStamina}  (러닝 1km = 10)", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+        Text("행동력 ${hero.stamina} / ${hero.maxStamina}  (걸음 100보 = 1)", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
         FantasyBar(hero.staminaProgress, Emerald)
         if (hero.statPoints > 0) {
             Text("✦ 사용하지 않은 능력치 포인트 ${hero.statPoints} — 영웅 · 가방에서 찍으세요", color = GoldBright, style = MaterialTheme.typography.bodySmall)
@@ -326,14 +344,17 @@ private fun HeroPanel(hero: HeroInfo) {
 }
 
 @Composable
-private fun RewardPanel(r: RunReward) {
-    Panel(title = "🏃 러닝 보상", highlight = true) {
-        if (r.leveledUp) {
-            Text("🎉 레벨 업! Lv.${r.levelBefore} → Lv.${r.levelAfter}  (포인트 +${r.statPointsGained})", color = GoldBright, fontWeight = FontWeight.Bold)
+private fun RewardPanel(r: RunReward?, stamina: Int, overflow: Int) {
+    Panel(title = "🏃 활동 보상", highlight = true) {
+        if (r != null) {
+            if (r.leveledUp) {
+                Text("🎉 레벨 업! Lv.${r.levelBefore} → Lv.${r.levelAfter}  (포인트 +${r.statPointsGained})", color = GoldBright, fontWeight = FontWeight.Bold)
+            }
+            Text("러닝 ${r.newRuns}건 · %.2fkm → EXP +${r.expGained} · 골드 +${r.goldGained}".format(r.countedKm), color = Gold)
+            r.rejected.forEach { Text("⚠ 보상 제외: $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
         }
-        Text("새 러닝 ${r.newRuns}건 · %.2fkm 반영".format(r.countedKm), color = Parchment)
-        Text("EXP +${r.expGained} · 골드 +${r.goldGained} · 행동력 +${r.staminaGained}", color = Gold)
-        r.rejected.forEach { Text("⚠ 보상 제외: $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
+        if (stamina > 0) Text("👣 걸음 → 행동력 +$stamina", color = Gold)
+        if (overflow > 0) Text("행동력이 가득 차서 $overflow 은(는) 받지 못했어요. 컨텐츠에 써 주세요!", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
     }
 }
 

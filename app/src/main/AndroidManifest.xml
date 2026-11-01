@@ -2,15 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 게임 보상: 러닝(운동 세션)과 거리 읽기 (삼성헬스 → Health Connect 로 동기화된 데이터) -->
+    <!-- 게임 보상: 러닝(운동 세션)·거리 → 경험치, 걸음수 → 행동력 (삼성헬스 → Health Connect) -->
     <uses-permission android:name="android.permission.health.READ_EXERCISE" />
     <uses-permission android:name="android.permission.health.READ_DISTANCE" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
     <!-- 자동 동기화: 앱이 꺼져 있을 때도 읽기 (Health Connect 가 지원하는 기기에서만) -->
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
 
     <!-- 개발용: 테스트 러닝 기록 (삼성헬스 없이 보상 흐름 검증용, 출시 전 제거) -->
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
     <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
+    <uses-permission android:name="android.permission.health.WRITE_STEPS" />
 
     <!-- 서버 동기화 -->
     <uses-permission android:name="android.permission.INTERNET" />

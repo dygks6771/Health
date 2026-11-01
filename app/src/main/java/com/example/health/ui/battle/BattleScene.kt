@@ -54,17 +54,21 @@ import kotlin.math.roundToInt
 /** 전투에 나서는 쪽 (영웅·몬스터) */
 data class Fighter(val name: String, val sprite: Sprite)
 
-/** 공격 1번 */
+/** 공격 1번 (영웅의 공격 또는 적의 반격) */
 data class BattleRound(
-    /** 공격하는 영웅 (파티 순번) */
+    /** 공격하는 영웅 (파티 순번). 적의 반격이면 무시 */
     val attacker: Int,
     val damage: Long,
     val crit: Boolean = false,
-    /** 공격 뒤 적 체력 (0~1) */
+    /** 이 공격 뒤 적 체력 (0~1) */
     val enemyHpAfter: Float,
     /** 적이 이 공격으로 모습이 바뀌면 (레이드 진화) */
     val enemySprite: Sprite? = null,
     val caption: String? = null,
+    /** true 면 적이 영웅(파티)을 공격 */
+    val enemyAttack: Boolean = false,
+    /** 이 공격 뒤 영웅(파티) 체력 (0~1) */
+    val heroHpAfter: Float? = null,
 )
 
 data class BattleSpec(
@@ -86,6 +90,12 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
     val lunge = remember { Animatable(0f) }
     val shake = remember { Animatable(0f) }
     val popup = remember { Animatable(1f) }
+    val enemyLunge = remember { Animatable(0f) }
+    val heroShake = remember { Animatable(0f) }
+    val heroPopup = remember { Animatable(1f) }
+    var heroHp by remember { mutableFloatStateOf(1f) }
+    var heroDamageText by remember { mutableStateOf("") }
+    val shownHeroHp by animateFloatAsState(heroHp, tween(300), label = "heroHp")
     var attacker by remember { mutableIntStateOf(-1) }
     var enemyHp by remember { mutableFloatStateOf(1f) }
     var enemySprite by remember { mutableStateOf(spec.enemy.sprite) }
@@ -96,6 +106,7 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
 
     fun skip() {
         spec.rounds.lastOrNull()?.let { last -> enemyHp = last.enemyHpAfter }
+        spec.rounds.lastOrNull { it.heroHpAfter != null }?.heroHpAfter?.let { heroHp = it }
         spec.rounds.lastOrNull { it.enemySprite != null }?.enemySprite?.let { enemySprite = it }
         attacker = -1
         finished = true
@@ -107,6 +118,28 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
         delay(400)
         for (round in spec.rounds) {
             if (finished) break
+            if (round.enemyAttack) {
+                // 적의 반격: 적이 왼쪽으로 돌진 → 영웅이 흔들리고 빨간 데미지 숫자
+                enemyLunge.animateTo(1f, tween(170))
+                if (finished) break
+                heroDamageText = "-%,d".format(round.damage)
+                launch {
+                    heroPopup.snapTo(0f)
+                    heroPopup.animateTo(1f, tween(700))
+                }
+                launch {
+                    repeat(3) {
+                        heroShake.animateTo(7f, tween(35))
+                        heroShake.animateTo(-7f, tween(35))
+                    }
+                    heroShake.animateTo(0f, tween(35))
+                }
+                round.heroHpAfter?.let { heroHp = it }
+                round.caption?.let { caption = it }
+                enemyLunge.animateTo(0f, tween(200))
+                delay(380)
+                continue
+            }
             attacker = round.attacker
             lunge.animateTo(1f, tween(150))
             if (finished) break
@@ -130,6 +163,7 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
         }
         if (!finished) skip()
         lunge.snapTo(0f)
+        enemyLunge.snapTo(0f)
     }
 
     Box(
@@ -153,7 +187,11 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // 영웅(파티)
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Box(contentAlignment = Alignment.TopCenter) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.offset { IntOffset(heroShake.value.dp.roundToPx(), 0) },
+                ) {
                     spec.heroes.forEachIndexed { i, hero ->
                         val heroSize = if (spec.heroes.size > 1) 64.dp else 120.dp
                         Column(
@@ -167,6 +205,18 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
                         }
                     }
                 }
+                if (heroDamageText.isNotEmpty()) {
+                    Text(
+                        heroDamageText,
+                        color = Crimson,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier
+                            .offset { IntOffset(0, -(heroPopup.value * 40.dp.toPx()).roundToInt()) }
+                            .graphicsLayer { alpha = 1f - heroPopup.value },
+                    )
+                }
+                }
 
                 // 적
                 Box(contentAlignment = Alignment.TopCenter) {
@@ -174,7 +224,9 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
                         enemySprite,
                         modifier = Modifier
                             .padding(top = 24.dp)
-                            .offset { IntOffset(shake.value.dp.roundToPx(), 0) },
+                            .offset {
+                                IntOffset(shake.value.dp.roundToPx() - (enemyLunge.value * 70.dp.toPx()).roundToInt(), 0)
+                            },
                         size = spec.enemySize,
                         flipX = true,
                     )
@@ -192,6 +244,8 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
                 }
             }
 
+            Text(if (spec.heroes.size > 1) "파티 체력" else "내 체력", color = Parchment, fontWeight = FontWeight.Bold)
+            FantasyBar(shownHeroHp, Emerald)
             caption?.let { Text(it, color = GoldBright, fontWeight = FontWeight.Bold) }
 
             if (finished) {
@@ -207,7 +261,10 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
     }
 }
 
-/** 적 체력을 [hits] 번에 나눠 깎는 전투 (토벌·던전). 결과는 항상 승리 */
+/**
+ * 적 체력을 [hits] 번에 나눠 깎는 전투 (토벌·던전). 영웅이 공격하면 적이 반격한다.
+ * [heroLoss] (0~0.9) 는 전투가 끝났을 때 잃은 체력 비율 — 적이 강할수록 크게. 결과는 항상 승리.
+ */
 fun simpleBattle(
     title: String,
     hero: Fighter,
@@ -216,23 +273,42 @@ fun simpleBattle(
     hits: Int,
     resultTitle: String,
     resultLines: List<String>,
+    heroMaxHp: Long,
+    heroLoss: Float,
     enemySize: Dp = 140.dp,
     seed: Int = 0,
 ): BattleSpec {
     val random = kotlin.random.Random(seed)
     // 무작위 비율로 나눈 뒤 합이 정확히 enemyHp 가 되도록 마지막 타격에서 맞춤
     val weights = List(hits) { 0.7 + random.nextDouble() * 0.6 }
+    val counters = (hits - 1).coerceAtLeast(1)
+    val totalHeroDamage = (heroMaxHp * heroLoss.coerceIn(0.05f, 0.9f)).toLong()
     var remaining = enemyHp
-    val rounds = weights.mapIndexed { i, w ->
+    var heroLeft = heroMaxHp
+    val rounds = mutableListOf<BattleRound>()
+    weights.forEachIndexed { i, w ->
         val damage = if (i == hits - 1) remaining else (enemyHp * w / weights.sum()).toLong().coerceAtMost(remaining)
         remaining -= damage
-        BattleRound(
+        val last = i == hits - 1
+        rounds += BattleRound(
             attacker = 0,
             damage = damage,
             crit = w > 1.15,
             enemyHpAfter = remaining.toFloat() / enemyHp,
-            caption = if (i == hits - 1) "${enemy.name} 을(를) 쓰러뜨렸다!" else null,
+            caption = if (last) "${enemy.name} 을(를) 쓰러뜨렸다!" else null,
         )
+        if (!last) {
+            val hit = (totalHeroDamage / counters * (0.8 + random.nextDouble() * 0.4)).toLong().coerceIn(0L, (heroLeft - 1).coerceAtLeast(0L))
+            heroLeft -= hit
+            rounds += BattleRound(
+                attacker = 0,
+                damage = hit,
+                enemyHpAfter = remaining.toFloat() / enemyHp,
+                enemyAttack = true,
+                heroHpAfter = heroLeft.toFloat() / heroMaxHp,
+                caption = "${enemy.name}의 반격!",
+            )
+        }
     }
     return BattleSpec(title, listOf(hero), enemy, enemySize, rounds, resultTitle, resultLines)
 }

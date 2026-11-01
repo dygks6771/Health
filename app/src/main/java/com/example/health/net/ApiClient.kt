@@ -61,6 +61,16 @@ class ApiClient(private val session: Session) {
         return obj("POST", "/api/me/runs", JSONObject().put("runs", list))
     }
 
+    /** 날짜별 걸음수 → 행동력 */
+    suspend fun syncSteps(days: List<Pair<java.time.LocalDate, Long>>): JSONObject {
+        val list = JSONArray()
+        days.forEach { (date, steps) -> list.put(JSONObject().put("date", date.toString()).put("steps", steps)) }
+        return obj("POST", "/api/me/steps", JSONObject().put("days", list))
+    }
+
+    /** 일괄 판매: [maxGrade] 이하 (COMMON / UNCOMMON / RARE …) */
+    suspend fun sellBulk(maxGrade: String): JSONObject = obj("POST", "/api/me/items/sell-bulk?maxGrade=$maxGrade")
+
     /** 최근 러닝 기록 20건과 보상 (빠진 이유 포함) */
     suspend fun runHistory(): JSONObject = obj("GET", "/api/me/runs")
 
