@@ -79,3 +79,5 @@ data class JobInfo(
 data class AppearanceInfo(val index: Int, val name: String)
 
 data class GameMetaResponse(val jobs: List<JobInfo>, val appearances: List<AppearanceInfo>)
+
+data class NameCheckResponse(val name: String, val available: Boolean, val reason: String?)

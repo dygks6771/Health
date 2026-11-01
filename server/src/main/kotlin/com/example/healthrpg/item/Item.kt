@@ -22,9 +22,10 @@ import java.time.Instant
 @Entity
 @Table(name = "items")
 class Item(
+    /** 경매장에서 팔리면 구매자로 바뀜 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "hero_id", nullable = false)
-    val hero: Hero,
+    var hero: Hero,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -57,6 +58,10 @@ class Item(
 
     @Column(nullable = false)
     var equipped: Boolean = false,
+
+    /** 경매장에 등록 중 */
+    @Column(nullable = false)
+    var listed: Boolean = false,
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -75,6 +80,9 @@ class Item(
 }
 
 interface ItemRepository : JpaRepository<Item, Long> {
+    /** 랭킹 계산용: 모든 영웅의 장착 장비를 한 번에 */
+    fun findAllByEquippedTrue(): List<Item>
+
     fun findAllByHeroIdOrderByEquippedDescIdDesc(heroId: Long): List<Item>
 
     fun findAllByHeroIdAndEquippedTrue(heroId: Long): List<Item>

@@ -9,6 +9,7 @@ import com.example.healthrpg.game.Appearances
 import com.example.healthrpg.game.GameRules
 import com.example.healthrpg.game.Job
 import com.example.healthrpg.game.Stat
+import com.example.healthrpg.item.Item
 import com.example.healthrpg.item.ItemFactory
 import com.example.healthrpg.item.ItemRepository
 import com.example.healthrpg.item.ItemResponse
@@ -56,7 +57,7 @@ class HeroService(
         val name = rawName.trim()
         if (!NAME_PATTERN.matches(name)) throw BadRequestException("이름은 한글·영문·숫자 2~12자입니다")
         if (appearance !in Appearances.names.indices) throw BadRequestException("없는 외형입니다")
-        if (heroRepository.existsByName(name)) throw ConflictException("이미 있는 이름입니다")
+        if (heroRepository.existsByNameIgnoreCase(name)) throw ConflictException("이미 사용 중인 이름입니다")
 
         val hero = Hero(account, name, job, appearance, bot)
         Stat.entries.forEach { hero.addStat(it, GameRules.BASE_STAT) }
@@ -65,6 +66,16 @@ class HeroService(
         heroRepository.save(hero)
         itemFactory.starterWeapon(hero)
         return hero
+    }
+
+    /** 이름을 쓸 수 있는지. 쓸 수 없으면 이유 */
+    fun nameProblem(rawName: String): String? {
+        val name = rawName.trim()
+        return when {
+            !NAME_PATTERN.matches(name) -> "이름은 한글·영문·숫자 2~12자입니다"
+            heroRepository.existsByNameIgnoreCase(name) -> "이미 사용 중인 이름입니다"
+            else -> null
+        }
     }
 
     /** 경험치를 더하고 레벨업마다 스탯 포인트 3 + 직업 주 능력치 +1. 반환: (이전 레벨, 이후 레벨) */
@@ -79,8 +90,13 @@ class HeroService(
     }
 
     /** 찍은 능력치 + 장착 장비 */
-    fun stats(hero: Hero): Map<Stat, Int> {
-        val bonus = equipmentBonus(hero.id!!)
+    fun stats(hero: Hero): Map<Stat, Int> =
+        statsWith(hero, itemRepository.findAllByHeroIdAndEquippedTrue(hero.id!!))
+
+    /** 장착 장비를 이미 불러온 경우 (랭킹처럼 여러 영웅을 한 번에 계산할 때) */
+    fun statsWith(hero: Hero, equipped: List<Item>): Map<Stat, Int> {
+        val bonus = mutableMapOf<Stat, Int>()
+        equipped.forEach { item -> item.bonuses().forEach { (stat, value) -> bonus.merge(stat, value, Int::plus) } }
         return Stat.entries.associateWith { hero.baseStat(it) + (bonus[it] ?: 0) }
     }
 

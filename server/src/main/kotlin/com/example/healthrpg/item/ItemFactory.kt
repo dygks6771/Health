@@ -23,6 +23,10 @@ class ItemFactory(
         return create(hero, slot, region.tier, rollGrade(region.gradeWeights), region.itemPrefix)
     }
 
+    /** 상점 뽑기: 지정한 부위 중 하나, 등급은 [weights] 확률 */
+    fun shopDraw(hero: Hero, slots: List<ItemSlot>, tier: Int, weights: List<Int>, prefix: String): Item =
+        create(hero, slots[random.nextInt(slots.size)], tier, rollGrade(weights), prefix)
+
     fun raidReward(hero: Hero, tier: Int, grade: Grade): Item =
         create(hero, ItemSlot.ACCESSORY, tier, grade, prefix = "마룡의")
 

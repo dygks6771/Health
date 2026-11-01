@@ -117,3 +117,40 @@ object ItemRules {
 }
 
 data class EnhanceCost(val stones: Int, val gold: Long)
+
+/** 상점 장비 뽑기 */
+object ShopRules {
+    /** 1회 가격: 내 레벨 지역 티어 × 150 골드 (초보자 마을 150 ~ 마왕성 1,500) */
+    fun price(tier: Int): Long = 150L * tier
+
+    /** 등급 확률 (천분율): 일반 60% · 고급 28% · 희귀 9% · 영웅 2.5% · 전설 0.5% */
+    val gradeWeights = listOf(600, 280, 90, 25, 5)
+}
+
+/** 상점 뽑기 종류 */
+enum class ShopCategory(val displayName: String, val slots: List<ItemSlot>, val prefix: String) {
+    WEAPON("무기", listOf(ItemSlot.WEAPON), "왕국 공방제"),
+    ARMOR("방어구", listOf(ItemSlot.ARMOR, ItemSlot.BOOTS), "왕국 공방제"),
+}
+
+object RankingRules {
+    /**
+     * 랭킹 점수 = 레벨 × 100 + 전투력.
+     * 전투력이 레벨보다 훨씬 큰 수라 그대로 더하면 레벨이 거의 반영되지 않아 레벨에 가중치를 둠.
+     */
+    const val LEVEL_WEIGHT = 100
+
+    fun score(level: Int, power: Int): Long = level.toLong() * LEVEL_WEIGHT + power
+}
+
+object AuctionRules {
+    /** 판매 대금에서 떼는 수수료 % */
+    const val FEE_PERCENT = 5
+    const val MIN_PRICE = 1L
+    const val MAX_PRICE = 10_000_000L
+
+    /** 한 사람이 동시에 올릴 수 있는 최대 개수 */
+    const val MAX_LISTINGS = 10
+
+    fun sellerReceives(price: Long): Long = price - price * FEE_PERCENT / 100
+}

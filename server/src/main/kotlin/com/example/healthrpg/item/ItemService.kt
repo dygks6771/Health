@@ -41,6 +41,7 @@ class ItemService(
     fun equip(accountId: Long, itemId: Long): InventoryResponse {
         val hero = heroService.requireForUpdate(accountId)
         val item = findOwned(hero.id!!, itemId)
+        requireNotListed(item)
         itemRepository.findAllByHeroIdAndEquippedTrue(hero.id!!)
             .filter { it.slot == item.slot && it.id != item.id }
             .forEach { it.equipped = false }
@@ -59,6 +60,7 @@ class ItemService(
     fun sell(accountId: Long, itemId: Long): InventoryResponse {
         val hero = heroService.requireForUpdate(accountId)
         val item = findOwned(hero.id!!, itemId)
+        requireNotListed(item)
         if (item.equipped) throw BadRequestException("장착 중인 장비는 팔 수 없습니다")
         hero.gold += ItemRules.sellPrice(item.tier, item.gradeEnum, item.enhance)
         itemRepository.delete(item)
@@ -70,6 +72,7 @@ class ItemService(
     fun enhance(accountId: Long, itemId: Long): EnhanceResultResponse {
         val hero = heroService.requireForUpdate(accountId)
         val item = findOwned(hero.id!!, itemId)
+        requireNotListed(item)
         val cost = ItemRules.enhanceCost(item.tier, item.enhance)
             ?: throw BadRequestException("이미 최대 강화(+${ItemRules.MAX_ENHANCE})입니다")
         val rate = ItemRules.successRate(item.enhance)!!
@@ -92,6 +95,10 @@ class ItemService(
             item = ItemResponse.from(item),
             hero = heroService.response(hero),
         )
+    }
+
+    private fun requireNotListed(item: Item) {
+        if (item.listed) throw BadRequestException("경매장에 등록된 장비입니다. 등록을 취소한 뒤 사용하세요")
     }
 
     private fun findOwned(heroId: Long, itemId: Long): Item =

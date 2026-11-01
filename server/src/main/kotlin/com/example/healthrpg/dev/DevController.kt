@@ -12,6 +12,8 @@ import com.example.healthrpg.game.GameRules
 import com.example.healthrpg.game.Job
 import com.example.healthrpg.hero.HeroRepository
 import com.example.healthrpg.hero.HeroService
+import com.example.healthrpg.raid.RaidRecordRepository
+import com.example.healthrpg.raid.RaidService
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.PostMapping
@@ -32,7 +34,17 @@ class DevController(
     private val friendService: FriendService,
     private val friendshipRepository: FriendshipRepository,
     private val random: Random,
+    private val raidService: RaidService,
+    private val raidRecordRepository: RaidRecordRepository,
 ) {
+    /** 레이드 주 1회 제한 초기화 (이번 주 기록 삭제) */
+    @PostMapping("/api/dev/raid-reset")
+    @Transactional
+    fun raidReset(@LoginAccount accountId: Long): Map<String, Int> {
+        val me = heroService.require(accountId)
+        return mapOf("deleted" to raidRecordRepository.deleteSince(me.id!!, raidService.weekStart()))
+    }
+
     /** 친구가 4명이 될 때까지 내 레벨의 봇 영웅을 만들어 친구로 추가 */
     @PostMapping("/api/dev/friend-bots")
     @Transactional

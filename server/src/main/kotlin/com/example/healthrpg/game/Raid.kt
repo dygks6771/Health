@@ -10,6 +10,9 @@ object RaidBoss {
     const val TURNS = 10
     const val STAMINA_COST = 30
 
+    /** 주(월요일 0시 ~ 일요일)당 도전 가능 횟수 */
+    const val WEEKLY_LIMIT = 1
+
     val stages = listOf(
         RaidStage(1, "새끼 마룡", threshold = 0, damageRate = 1.0),
         RaidStage(2, "성체 마룡", threshold = 3_000, damageRate = 0.8),

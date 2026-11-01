@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
@@ -26,6 +27,13 @@ class HeroController(
         },
         appearances = Appearances.names.mapIndexed { i, name -> AppearanceInfo(i, name) },
     )
+
+    /** 영웅 이름 중복 확인 (로그인 불필요) */
+    @GetMapping("/api/game/names/available")
+    fun nameAvailable(@RequestParam name: String): NameCheckResponse {
+        val problem = heroService.nameProblem(name)
+        return NameCheckResponse(name.trim(), available = problem == null, reason = problem)
+    }
 
     /** 내 영웅. 아직 없으면 404 (code=HERO_NOT_FOUND) → 앱이 영웅 생성 화면으로 이동 */
     @GetMapping("/api/me/hero")

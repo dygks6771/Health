@@ -22,6 +22,8 @@ data class ItemResponse(
     val subValue: Int,
     val enhance: Int,
     val equipped: Boolean,
+    /** 경매장 등록 중 */
+    val listed: Boolean,
     val sellPrice: Long,
     /** 다음 강화 성공률(%)과 비용. 최대 강화면 null */
     val nextEnhanceRate: Int?,
@@ -48,6 +50,7 @@ data class ItemResponse(
                 subValue = ItemRules.enhanced(item.subValue, item.enhance),
                 enhance = item.enhance,
                 equipped = item.equipped,
+                listed = item.listed,
                 sellPrice = ItemRules.sellPrice(item.tier, grade, item.enhance),
                 nextEnhanceRate = ItemRules.successRate(item.enhance),
                 nextEnhanceStones = cost?.stones,

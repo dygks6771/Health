@@ -20,6 +20,10 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
+import java.time.DayOfWeek
+import java.time.Duration
+import java.time.Instant
+import java.time.temporal.TemporalAdjusters
 import kotlin.random.Random
 
 data class RaidInfoResponse(
@@ -33,6 +37,9 @@ data class RaidInfoResponse(
     val friends: List<HeroSummary>,
     val bestGrade: String?,
     val bestDamage: Long?,
+    /** 이번 주 남은 도전 횟수 (주 1회, 월요일 0시 초기화) */
+    val remainingThisWeek: Int,
+    val resetsAt: Instant,
 )
 
 data class RaidAttackRequest(
@@ -93,6 +100,8 @@ class RaidService(
             friends = friendService.acceptedFriends(hero.id!!).map(heroService::summary).sortedByDescending { it.power },
             bestGrade = best?.grade,
             bestDamage = best?.totalDamage,
+            remainingThisWeek = remaining(hero.id!!),
+            resetsAt = weekStart().plus(Duration.ofDays(7)),
         )
     }
 
@@ -103,6 +112,7 @@ class RaidService(
         if (ids.size != RaidBoss.PARTY_SIZE - 1) throw BadRequestException("서로 다른 친구 4명을 골라 주세요")
         val friends = friendService.acceptedFriends(hero.id!!).associateBy { it.id!! }
         val party = listOf(hero) + ids.map { friends[it] ?: throw BadRequestException("친구가 아닌 영웅이 있습니다") }
+        if (remaining(hero.id!!) <= 0) throw BadRequestException("레이드는 주 ${RaidBoss.WEEKLY_LIMIT}회입니다. 월요일 0시에 초기화됩니다")
         if (hero.stamina < RaidBoss.STAMINA_COST) throw BadRequestException("행동력 ${RaidBoss.STAMINA_COST} 필요")
         hero.stamina -= RaidBoss.STAMINA_COST
 
@@ -149,6 +159,14 @@ class RaidService(
             hero = heroService.response(hero),
         )
     }
+
+    /** 이번 주 월요일 0시 (게임 시간대 기준) */
+    fun weekStart(): Instant =
+        heroService.today().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay(heroService.zoneId).toInstant()
+
+    private fun remaining(heroId: Long): Int =
+        (RaidBoss.WEEKLY_LIMIT - raidRecordRepository.countByHeroIdAndCreatedAtGreaterThanEqual(heroId, weekStart()).toInt())
+            .coerceAtLeast(0)
 }
 
 @RestController

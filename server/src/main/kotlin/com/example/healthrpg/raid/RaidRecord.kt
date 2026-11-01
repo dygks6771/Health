@@ -11,6 +11,8 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
 import java.time.Instant
 
 @Entity
@@ -43,4 +45,11 @@ class RaidRecord(
 
 interface RaidRecordRepository : JpaRepository<RaidRecord, Long> {
     fun findFirstByHeroIdOrderByTotalDamageDesc(heroId: Long): RaidRecord?
+
+    fun countByHeroIdAndCreatedAtGreaterThanEqual(heroId: Long, from: Instant): Long
+
+    /** 개발용: 이번 주 레이드 기록 삭제 (주 1회 제한 초기화) */
+    @Modifying
+    @Query("delete from RaidRecord r where r.hero.id = :heroId and r.createdAt >= :from")
+    fun deleteSince(heroId: Long, from: Instant): Int
 }

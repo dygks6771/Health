@@ -122,6 +122,15 @@ interface HeroRepository : JpaRepository<Hero, Long> {
 
     fun existsByName(name: String): Boolean
 
+    /** 대소문자만 다른 이름(Arthur / arthur)도 같은 이름으로 취급 */
+    fun existsByNameIgnoreCase(name: String): Boolean
+
+    fun findAllByBotFalse(): List<Hero>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select h from Hero h where h.id = :id")
+    fun findByIdForUpdate(id: Long): Hero?
+
     /** 보상·재화가 오가는 요청끼리 겹쳐서 중복 지급되지 않도록 행 잠금 */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select h from Hero h where h.account.id = :accountId")
