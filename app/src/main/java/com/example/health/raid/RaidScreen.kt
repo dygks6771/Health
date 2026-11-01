@@ -3,6 +3,7 @@ package com.example.health.raid
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,7 +32,12 @@ import com.example.health.game.Portraits
 import com.example.health.game.RaidInfo
 import com.example.health.game.RaidResult
 import com.example.health.net.ApiClient
+import com.example.health.ui.battle.BattleOverlay
+import com.example.health.ui.battle.BattleRound
+import com.example.health.ui.battle.BattleSpec
+import com.example.health.ui.battle.Fighter
 import com.example.health.ui.fantasy.ActionFeedback
+import com.example.health.ui.sprites.HeroSprites
 import com.example.health.ui.fantasy.FantasyBar
 import com.example.health.ui.fantasy.GoldButton
 import com.example.health.ui.fantasy.Panel
@@ -69,6 +75,7 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
     var info by remember { mutableStateOf<RaidInfo?>(null) }
     var result by remember { mutableStateOf<RaidResult?>(null) }
     val selected = remember { mutableStateListOf<Long>() }
+    var battle by remember { mutableStateOf<BattleSpec?>(null) }
     val actions = rememberActions()
 
     suspend fun load() {
@@ -77,6 +84,7 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
 
     LaunchedEffect(Unit) { actions.run { load(); null } }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -164,6 +172,7 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
                         val r = RaidResult.from(json)
                         onHeroJson(json.getJSONObject("hero"))
                         result = r
+                        battle = raidBattle(r, raid)
                         load()
                         null
                     }
@@ -179,6 +188,43 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
             GhostButton("주간 제한 초기화", onClick = { actions.run { api.devRaidReset(); load(); "초기화했습니다" } }, enabled = !actions.busy)
         }
     }
+    battle?.let { BattleOverlay(it) { battle = null } }
+    }
+}
+
+/** 서버가 계산한 10턴 결과를 전투 장면으로: 턴마다 한 명씩 돌진, 누적 데미지가 기준을 넘으면 마룡 진화 */
+private fun raidBattle(r: RaidResult, info: RaidInfo): BattleSpec {
+    val party = r.members.map { Fighter(it.name, HeroSprites.hero(it.job, it.appearance)) }
+    fun hpAfter(total: Long, stage: Int): Float {
+        val current = info.stages.firstOrNull { it.stage == stage }?.threshold ?: 0L
+        val next = info.stages.firstOrNull { it.stage == stage + 1 }?.threshold ?: (current * 2).coerceAtLeast(1L)
+        return 1f - ((total - current).toFloat() / (next - current).coerceAtLeast(1L)).coerceIn(0f, 1f)
+    }
+    var previousStage = 1
+    val rounds = r.turns.map { t ->
+        val evolved = t.stage != previousStage
+        previousStage = t.stage
+        BattleRound(
+            attacker = (t.turn - 1) % party.size.coerceAtLeast(1),
+            damage = t.damage,
+            enemyHpAfter = hpAfter(t.totalDamage, t.stage),
+            enemySprite = if (evolved) DragonSprite.stage(t.stage) else null,
+            caption = if (evolved) "⚠ 마룡이 진화했다! ${t.stage}단계 ${t.stageName}" else "${t.turn}턴 · 누적 %,d".format(t.totalDamage),
+        )
+    }
+    return BattleSpec(
+        title = "레이드: ${info.bossName}",
+        heroes = party,
+        enemy = Fighter(info.bossName, DragonSprite.stage(1)),
+        enemySize = 180.dp,
+        rounds = rounds,
+        resultTitle = "레이드 결과: ${r.grade} 등급",
+        resultLines = listOfNotNull(
+            "총 데미지 %,d · 최종 ${r.finalStage}단계 ${r.finalStageName}".format(r.totalDamage),
+            "골드 +${r.rewardGold} · 강화석 +${r.rewardStones}",
+            r.item?.let { "획득: [${it.gradeName}] ${it.displayName} (${it.statText})" },
+        ),
+    )
 }
 
 @Composable

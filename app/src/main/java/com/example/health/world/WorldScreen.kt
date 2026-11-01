@@ -1,6 +1,7 @@
 package com.example.health.world
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,7 +27,13 @@ import com.example.health.game.ItemInfo
 import com.example.health.game.Portraits
 import com.example.health.game.RegionInfo
 import com.example.health.net.ApiClient
+import com.example.health.ui.battle.BattleOverlay
+import com.example.health.ui.battle.BattleSpec
+import com.example.health.ui.battle.Fighter
+import com.example.health.ui.battle.simpleBattle
 import com.example.health.ui.fantasy.ActionFeedback
+import com.example.health.ui.sprites.HeroSprites
+import com.example.health.ui.sprites.MonsterSprites
 import com.example.health.ui.fantasy.GoldButton
 import com.example.health.ui.fantasy.Panel
 import com.example.health.ui.fantasy.ResourceChip
@@ -47,6 +54,7 @@ private data class DungeonResult(val dungeon: String, val stones: Int, val gold:
 fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit, onBack: () -> Unit) {
     var regions by remember { mutableStateOf<List<RegionInfo>>(emptyList()) }
     var result by remember { mutableStateOf<DungeonResult?>(null) }
+    var battle by remember { mutableStateOf<BattleSpec?>(null) }
     val actions = rememberActions()
 
     suspend fun load() {
@@ -55,6 +63,7 @@ fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
 
     LaunchedEffect(Unit) { actions.run { load(); null } }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -91,11 +100,26 @@ fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                 actions.run {
                     val json = api.dungeon(region.tier)
                     onHeroJson(json.getJSONObject("hero"))
-                    result = DungeonResult(
+                    val r = DungeonResult(
                         dungeon = json.getString("dungeon"),
                         stones = json.getInt("rewardStones"),
                         gold = json.getLong("rewardGold"),
                         item = if (json.isNull("item")) null else ItemInfo.from(json.getJSONObject("item")),
+                    )
+                    result = r
+                    battle = simpleBattle(
+                        title = "던전: ${region.dungeonName}",
+                        hero = Fighter(hero.name, HeroSprites.hero(hero.job, hero.appearance)),
+                        enemy = Fighter(region.boss, MonsterSprites.monster(region.boss)),
+                        enemyHp = region.minTotalStats * 40L + 500,
+                        hits = 6,
+                        resultTitle = "🏆 ${r.dungeon} 공략 성공!",
+                        resultLines = listOf(
+                            "강화석 +${r.stones} · 골드 +${r.gold}",
+                            r.item?.let { "획득: [${it.gradeName}] ${it.displayName} (${it.statText})" } ?: "이번에는 장비가 나오지 않았습니다",
+                        ),
+                        enemySize = 170.dp,
+                        seed = region.tier,
                     )
                     load()
                     null
@@ -103,6 +127,8 @@ fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
             }
         }
         item { Text("") }
+    }
+    battle?.let { BattleOverlay(it) { battle = null } }
     }
 }
 
@@ -116,7 +142,7 @@ private fun RegionCard(region: RegionInfo, enabled: Boolean, onEnter: () -> Unit
                 Text(region.description, color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
             }
         }
-        Text("⚔ 던전: ${region.dungeonName}" + if (region.clears > 0) "  (공략 ${region.clears}회)" else "", color = Parchment, fontWeight = FontWeight.SemiBold)
+        Text("⚔ 던전: ${region.dungeonName} · 보스 ${region.boss}" + if (region.clears > 0) "  (공략 ${region.clears}회)" else "", color = Parchment, fontWeight = FontWeight.SemiBold)
         Text("입장 조건: Lv.${region.minLevel} · 능력치 합 ${region.minTotalStats} · 행동력 ${region.staminaCost}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
         Text("보상: 강화석 ${region.rewardStones} · 골드 ${region.rewardGold} · 장비 ${region.dropRate}%", color = Gold, style = MaterialTheme.typography.bodySmall)
         Text("장비 등급: ${region.dropGrades}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)

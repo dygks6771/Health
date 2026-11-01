@@ -39,7 +39,7 @@ import com.example.health.ui.theme.Parchment
 import com.example.health.ui.theme.ParchmentDim
 import org.json.JSONObject
 
-private val slotOrder = listOf("WEAPON" to "무기", "ARMOR" to "갑옷", "BOOTS" to "장화", "ACCESSORY" to "목걸이")
+private val slotOrder = listOf("WEAPON" to "무기", "HELMET" to "투구", "ARMOR" to "갑옷", "BOOTS" to "장화", "ACCESSORY" to "목걸이")
 
 /** 영웅 · 가방: 능력치 찍기, 장착 장비, 보유 장비 장착/판매 */
 @Composable

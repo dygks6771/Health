@@ -92,6 +92,8 @@ data class HeroInfo(
     val stats: List<StatInfo>,
     val equipment: List<ItemInfo>,
     val todayKm: Double,
+    /** 오늘 실제 보상받은 거리 (속도 초과·하루 상한 제외) */
+    val todayRewardKm: Double,
     val weekKm: Double,
 ) {
     val expProgress: Float get() = if (expToNextLevel <= 0) 0f else expInLevel.toFloat() / expToNextLevel
@@ -118,8 +120,29 @@ data class HeroInfo(
             stats = j.getJSONArray("stats").mapObjects(StatInfo::from),
             equipment = ItemInfo.listFrom(j.getJSONArray("equipment")),
             todayKm = j.getDouble("todayKm"),
+            todayRewardKm = j.optDouble("todayRewardKm", j.getDouble("todayKm")),
             weekKm = j.getDouble("weekKm"),
         )
+    }
+}
+
+/** 러닝 기록 1건과 그 보상 */
+data class RunHistory(
+    val runDate: String,
+    val startTime: String,
+    val distanceKm: Double,
+    val countedKm: Double,
+    val expAwarded: Int,
+    val goldAwarded: Int,
+    val rejectedReason: String?,
+) {
+    companion object {
+        fun listFrom(j: JSONObject): List<RunHistory> = j.getJSONArray("runs").mapObjects {
+            RunHistory(
+                it.getString("runDate"), it.getString("startTime"), it.getDouble("distanceKm"), it.getDouble("countedKm"),
+                it.getInt("expAwarded"), it.getInt("goldAwarded"), it.stringOrNull("rejectedReason"),
+            )
+        }
     }
 }
 
@@ -226,6 +249,7 @@ data class RegionInfo(
     val name: String,
     val description: String,
     val dungeonName: String,
+    val boss: String,
     val minLevel: Int,
     val minTotalStats: Int,
     val staminaCost: Int,
@@ -245,6 +269,7 @@ data class RegionInfo(
                 name = it.getString("name"),
                 description = it.getString("description"),
                 dungeonName = d.getString("name"),
+                boss = d.optString("boss", d.getString("name")),
                 minLevel = d.getInt("minLevel"),
                 minTotalStats = d.getInt("minTotalStats"),
                 staminaCost = d.getInt("staminaCost"),
@@ -314,7 +339,7 @@ data class RaidInfo(
 
 data class RaidTurnInfo(val turn: Int, val damage: Long, val totalDamage: Long, val stage: Int, val stageName: String, val evolved: Boolean)
 
-data class RaidMember(val name: String, val jobName: String, val damage: Long)
+data class RaidMember(val name: String, val job: String, val jobName: String, val appearance: Int, val damage: Long)
 
 data class RaidResult(
     val totalDamage: Long,
@@ -341,7 +366,10 @@ data class RaidResult(
                 )
             },
             members = j.getJSONArray("members").mapObjects {
-                RaidMember(it.getString("name"), it.getString("jobName"), it.getLong("damage"))
+                RaidMember(
+                    it.getString("name"), it.optString("job", "WARRIOR"), it.getString("jobName"),
+                    it.optInt("appearance", 0), it.getLong("damage"),
+                )
             },
             rewardGold = j.getLong("rewardGold"),
             rewardStones = j.getInt("rewardStones"),

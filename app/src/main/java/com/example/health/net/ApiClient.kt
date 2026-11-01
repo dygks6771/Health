@@ -61,6 +61,9 @@ class ApiClient(private val session: Session) {
         return obj("POST", "/api/me/runs", JSONObject().put("runs", list))
     }
 
+    /** 최근 러닝 기록 20건과 보상 (빠진 이유 포함) */
+    suspend fun runHistory(): JSONObject = obj("GET", "/api/me/runs")
+
     // ── 가방·대장간 ──
     suspend fun items(): JSONObject = obj("GET", "/api/me/items")
     suspend fun equip(itemId: Long): JSONObject = obj("POST", "/api/me/items/$itemId/equip")

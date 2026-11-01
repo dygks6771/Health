@@ -88,6 +88,20 @@ object ItemSprites {
         "...KKKKKK...",
         "............",
     )
+    private val helmet = listOf(
+        "............",
+        "....KKKK....",
+        "..KKMMMMKK..",
+        ".KMMMMMMMMK.",
+        ".KMMMGGMMMK.",
+        ".KMMMMMMMMK.",
+        ".KMKKKKKKMK.",
+        ".KMK.mm.KMK.",
+        ".KMK.mm.KMK.",
+        ".KMK....KMK.",
+        "..KK....KK..",
+        "............",
+    )
     private val boots = listOf(
         "............",
         "...KKKK.....",
@@ -117,10 +131,11 @@ object ItemSprites {
         ".....KK.....",
     )
 
-    /** [slot] = WEAPON / ARMOR / BOOTS / ACCESSORY, 무기는 이름으로 종류 구분 */
+    /** [slot] = WEAPON / HELMET / ARMOR / BOOTS / ACCESSORY, 무기는 이름으로 종류 구분 */
     fun icon(slot: String, name: String, gradeColor: Color): Sprite {
         val rows = when (slot) {
             "ARMOR" -> armor
+            "HELMET" -> helmet
             "BOOTS" -> boots
             "ACCESSORY" -> necklace
             else -> when {

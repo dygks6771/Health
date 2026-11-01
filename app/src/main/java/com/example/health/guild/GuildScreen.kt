@@ -1,6 +1,7 @@
 package com.example.health.guild
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,7 +30,13 @@ import com.example.health.ui.fantasy.Panel
 import com.example.health.ui.fantasy.ResourceChip
 import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.fantasy.rememberActions
+import com.example.health.ui.battle.BattleOverlay
+import com.example.health.ui.battle.BattleSpec
+import com.example.health.ui.battle.Fighter
+import com.example.health.ui.battle.simpleBattle
+import com.example.health.ui.sprites.HeroSprites
 import com.example.health.ui.sprites.MonsterAvatar
+import com.example.health.ui.sprites.MonsterSprites
 import com.example.health.ui.sprites.NpcBanner
 import com.example.health.ui.sprites.NpcSprites
 import com.example.health.ui.theme.Crimson
@@ -45,6 +52,7 @@ import org.json.JSONObject
 @Composable
 fun GuildScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit, onBack: () -> Unit) {
     var board by remember { mutableStateOf<GuildBoard?>(null) }
+    var battle by remember { mutableStateOf<BattleSpec?>(null) }
     val actions = rememberActions()
 
     suspend fun load() {
@@ -53,6 +61,7 @@ fun GuildScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
 
     LaunchedEffect(Unit) { actions.run { load(); null } }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -70,11 +79,23 @@ fun GuildScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                 actions.run {
                     val json = api.hunt(hunt.slot)
                     onHeroJson(json.getJSONObject("hero"))
+                    battle = simpleBattle(
+                        title = "토벌: ${hunt.monster}",
+                        hero = Fighter(hero.name, HeroSprites.hero(hero.job, hero.appearance)),
+                        enemy = Fighter("Lv.${hunt.targetLevel} ${hunt.monster}", MonsterSprites.monster(hunt.monster)),
+                        enemyHp = hunt.requiredPower * 3L,
+                        hits = if (hunt.difficulty == "HARD") 5 else 4,
+                        resultTitle = "🏆 토벌 성공!",
+                        resultLines = listOf("${hunt.monster} 토벌 완료", "골드 +${json.getInt("rewardGold")}"),
+                        seed = hunt.slot,
+                    )
                     load()
-                    "🏆 ${json.getString("monster")} 토벌 완료! 골드 +${json.getInt("rewardGold")}"
+                    null
                 }
             }
         }
+    }
+    battle?.let { BattleOverlay(it) { battle = null } }
     }
 }
 

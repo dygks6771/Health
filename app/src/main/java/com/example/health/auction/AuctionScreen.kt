@@ -2,6 +2,7 @@ package com.example.health.auction
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,7 +49,7 @@ import com.example.health.ui.theme.Parchment
 import com.example.health.ui.theme.ParchmentDim
 import org.json.JSONObject
 
-private val slotFilters = listOf(null to "전체", "WEAPON" to "무기", "ARMOR" to "갑옷", "BOOTS" to "장화", "ACCESSORY" to "목걸이")
+private val slotFilters = listOf(null to "전체", "WEAPON" to "무기", "HELMET" to "투구", "ARMOR" to "갑옷", "BOOTS" to "장화", "ACCESSORY" to "목걸이")
 
 /** 경매장: 다른 모험가의 장비 구매 / 내 장비 판매 등록 (수수료 5%) */
 @Composable
@@ -93,7 +94,7 @@ fun AuctionScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Un
         ActionFeedback(actions)
 
         if (!sellTab) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 slotFilters.forEach { (code, label) ->
                     Text(
                         label,

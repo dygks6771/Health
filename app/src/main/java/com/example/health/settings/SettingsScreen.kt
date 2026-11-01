@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
+import com.example.health.game.RunHistory
 import com.example.health.health.RunReader
 import com.example.health.net.ApiClient
 import com.example.health.net.Session
@@ -32,6 +33,8 @@ import com.example.health.ui.fantasy.GoldButton
 import com.example.health.ui.fantasy.Panel
 import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.fantasy.rememberActions
+import com.example.health.ui.theme.Crimson
+import com.example.health.ui.theme.Parchment
 import com.example.health.ui.theme.ParchmentDim
 import org.json.JSONObject
 
@@ -48,6 +51,7 @@ fun SettingsScreen(
     val reader = remember { RunReader(context.applicationContext) }
     val syncer = remember { RunSyncer(reader, session, api) }
     var serverUrl by remember { mutableStateOf(session.serverUrl) }
+    var history by remember { mutableStateOf<List<RunHistory>>(emptyList()) }
     val actions = rememberActions()
     val writePermissionLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract(),
@@ -114,6 +118,23 @@ fun SettingsScreen(
             )
         }
 
+        Panel(title = "최근 러닝 기록과 보상") {
+            GhostButton("불러오기", onClick = { actions.run { history = RunHistory.listFrom(api.runHistory()); null } }, enabled = !actions.busy)
+            history.forEach { r ->
+                Text(
+                    "${r.runDate} ${localTime(r.startTime)} · %.2fkm → 보상 %.2fkm · EXP +${r.expAwarded}".format(r.distanceKm, r.countedKm),
+                    color = if (r.rejectedReason == null) Parchment else ParchmentDim,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                r.rejectedReason?.let { Text("   ⚠ $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
+            }
+            Text(
+                "보상 규칙: 1km = EXP 50 · 하루 20km 까지 · 평균 시속 25km 초과 기록은 제외 (시간대가 겹친 기록은 거리가 합쳐져 초과될 수 있음)",
+                color = ParchmentDim,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
         Panel(title = "계정") {
             Text("로그인: ${session.loginId ?: "-"}", color = ParchmentDim)
             GoldButton(
@@ -131,3 +152,8 @@ fun SettingsScreen(
         }
     }
 }
+
+private val hhmm = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+
+private fun localTime(isoInstant: String): String =
+    runCatching { hhmm.format(java.time.Instant.parse(isoInstant).atZone(java.time.ZoneId.systemDefault())) }.getOrDefault("")

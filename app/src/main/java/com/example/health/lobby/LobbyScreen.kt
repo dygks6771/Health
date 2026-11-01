@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.example.health.ui.fantasy.gradeColor
 import com.example.health.ui.sprites.HeroAvatar
@@ -173,14 +174,14 @@ fun LobbyScreen(
                 )
                 GhostButton("동기화", onClick = { scope.launch { syncNow() } }, enabled = !syncing)
             }
-            // 아래 메뉴 버튼에 가리지 않도록 여백
-            Text("", modifier = Modifier.padding(bottom = 56.dp))
+            // 아래 바로가기 바에 가리지 않도록 여백
+            Text("", modifier = Modifier.padding(bottom = 84.dp))
         }
 
-        GoldButton(
-            "☰  메뉴",
-            onClick = { menuOpen = true },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).fillMaxWidth(0.6f),
+        QuickBar(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            onNavigate = onNavigate,
+            onMenu = { menuOpen = true },
         )
 
         if (menuOpen) {
@@ -191,6 +192,49 @@ fun LobbyScreen(
                 },
                 onClose = { menuOpen = false },
             )
+        }
+    }
+}
+
+/** 하단 바로가기: 모험 · 모험자 길드 · 레이드 + 전체 메뉴 */
+@Composable
+private fun QuickBar(modifier: Modifier, onNavigate: (Screen) -> Unit, onMenu: () -> Unit) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf(
+            Triple("🗺️", "모험", Screen.WORLD),
+            Triple("📜", "길드", Screen.GUILD),
+            Triple("🐉", "레이드", Screen.RAID),
+        ).forEach { (icon, label, screen) ->
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, Gold, RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                    .clickable { onNavigate(screen) }
+                    .padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(icon, fontSize = 22.sp)
+                Text(label, color = GoldBright, style = MaterialTheme.typography.labelLarge)
+            }
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .border(1.dp, GoldBright, RoundedCornerShape(10.dp))
+                .background(Gold, RoundedCornerShape(10.dp))
+                .clickable(onClick = onMenu)
+                .padding(vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("☰", fontSize = 22.sp, color = Color.Black)
+            Text("메뉴", color = Color.Black, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -227,7 +271,7 @@ private fun MenuOverlay(onSelect: (Screen) -> Unit, onClose: () -> Unit) {
 @Composable
 private fun EquipmentPanel(hero: HeroInfo) {
     Panel(title = "장착 장비") {
-        listOf("WEAPON" to "무기", "ARMOR" to "갑옷", "BOOTS" to "장화", "ACCESSORY" to "목걸이").forEach { (slot, label) ->
+        listOf("WEAPON" to "무기", "HELMET" to "투구", "ARMOR" to "갑옷", "BOOTS" to "장화", "ACCESSORY" to "목걸이").forEach { (slot, label) ->
             val item = hero.equipment.firstOrNull { it.slot == slot }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ItemIcon(item, 40.dp, emptySlot = slot)
@@ -261,7 +305,14 @@ private fun HeroPanel(hero: HeroInfo) {
                 Text(hero.name, style = MaterialTheme.typography.headlineSmall, color = GoldBright)
                 Text("Lv.${hero.level} · ${hero.jobRole}", color = Parchment, fontWeight = FontWeight.SemiBold)
                 Text("⚔ 전투력 %,d".format(hero.power), color = Gold, style = MaterialTheme.typography.titleMedium)
-                Text("🏃 오늘 %.2fkm · 이번 주 %.1fkm".format(hero.todayKm, hero.weekKm), color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                Text("🏃 오늘 보상 %.2fkm · 이번 주 %.1fkm".format(hero.todayRewardKm, hero.weekKm), color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                if (hero.todayKm - hero.todayRewardKm > 0.01) {
+                    Text(
+                        "⚠ 오늘 %.2fkm 중 %.2fkm 는 보상 제외 (설정 → 최근 러닝 기록)".format(hero.todayKm, hero.todayKm - hero.todayRewardKm),
+                        color = Crimson,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
         Text("EXP ${hero.expInLevel} / ${hero.expToNextLevel}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
