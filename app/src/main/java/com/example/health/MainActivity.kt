@@ -17,19 +17,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.health.character.CharacterScreen
+import com.example.health.content.ContentScreen
 import com.example.health.health.StepsTestScreen
-import com.example.health.sync.StepsSyncWorker
+import com.example.health.sync.SyncWorker
 import com.example.health.ui.theme.HealthTheme
 
 class MainActivity : ComponentActivity() {
 
-    /** 앱으로 돌아올 때마다 증가 → 캐릭터 화면이 자동으로 다시 동기화 */
+    /** 앱으로 돌아올 때마다 증가 → 화면이 자동으로 다시 동기화 */
     private var resumeCount by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        StepsSyncWorker.schedule(this)
+        SyncWorker.schedule(this)
         setContent {
             HealthTheme {
                 HealthApp(resumeKey = resumeCount)
@@ -43,6 +44,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private data class Tab(val icon: String, val label: String)
+
+private val tabs = listOf(Tab("🧍", "캐릭터"), Tab("⚔️", "컨텐츠"), Tab("🛠️", "개발자"))
+
 @Composable
 fun HealthApp(resumeKey: Int) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -50,24 +55,22 @@ fun HealthApp(resumeKey: Int) {
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
             NavigationBar {
-                NavigationBarItem(
-                    selected = tab == 0,
-                    onClick = { tab = 0 },
-                    icon = { Text("⚔️") },
-                    label = { Text("캐릭터") },
-                )
-                NavigationBarItem(
-                    selected = tab == 1,
-                    onClick = { tab = 1 },
-                    icon = { Text("🛠️") },
-                    label = { Text("개발자") },
-                )
+                tabs.forEachIndexed { i, t ->
+                    NavigationBarItem(
+                        selected = tab == i,
+                        onClick = { tab = i },
+                        icon = { Text(t.icon) },
+                        label = { Text(t.label) },
+                    )
+                }
             }
         },
     ) { innerPadding ->
+        val modifier = Modifier.padding(innerPadding)
         when (tab) {
-            0 -> CharacterScreen(resumeKey = resumeKey, modifier = Modifier.padding(innerPadding))
-            else -> StepsTestScreen(modifier = Modifier.padding(innerPadding))
+            0 -> CharacterScreen(resumeKey = resumeKey, modifier = modifier)
+            1 -> ContentScreen(resumeKey = resumeKey, modifier = modifier)
+            else -> StepsTestScreen(modifier = modifier)
         }
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -34,43 +35,44 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import com.example.health.game.CharacterLook
 import com.example.health.game.GameCharacter
-import com.example.health.game.QuestStatus
-import com.example.health.game.SyncReward
-import com.example.health.health.StepsReader
-import com.example.health.sync.StepsSyncer
+import com.example.health.game.RunReward
+import com.example.health.health.RunReader
+import com.example.health.sync.RunSyncer
+import com.example.health.sync.ServerApi
 import com.example.health.sync.SyncSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * 메인 화면: 캐릭터, 레벨, 경험치, 골드, 퀘스트.
- * 화면이 열릴 때마다([resumeKey] 가 바뀔 때마다) 자동으로 서버와 동기화한다.
+ * 메인 화면: 캐릭터, 레벨, 행동력, 스탯, 장비.
+ * 화면이 열릴 때마다([resumeKey] 가 바뀔 때마다) 러닝 기록을 자동으로 서버와 동기화한다.
  */
 @Composable
 fun CharacterScreen(resumeKey: Int, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val reader = remember { StepsReader(context.applicationContext) }
+    val reader = remember { RunReader(context.applicationContext) }
     val settings = remember { SyncSettings(context.applicationContext) }
-    val syncer = remember { StepsSyncer(reader, settings) }
+    val syncer = remember { RunSyncer(reader, settings) }
     val scope = rememberCoroutineScope()
 
     var character by remember { mutableStateOf(syncer.cachedCharacter()) }
-    var reward by remember { mutableStateOf<SyncReward?>(null) }
+    var reward by remember { mutableStateOf<RunReward?>(null) }
     var needPermission by remember { mutableStateOf(false) }
-    var syncing by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var lastSyncAt by remember { mutableLongStateOf(settings.lastSyncAt) }
 
     suspend fun syncNow() {
-        if (syncing) return
+        if (busy) return
         if (reader.sdkStatus() != HealthConnectClient.SDK_AVAILABLE) {
             error = "이 기기에서는 Health Connect 를 사용할 수 없습니다."
             return
         }
-        syncing = true
+        busy = true
         error = null
         try {
             if (!reader.hasAllPermissions()) {
@@ -87,7 +89,29 @@ fun CharacterScreen(resumeKey: Int, modifier: Modifier = Modifier) {
         } catch (e: Exception) {
             error = "서버에 연결하지 못했습니다: ${e.message ?: e.javaClass.simpleName}"
         } finally {
-            syncing = false
+            busy = false
+        }
+    }
+
+    /** 스탯 찍기·강화처럼 캐릭터를 바꾸는 요청. 응답의 캐릭터로 화면 갱신 */
+    fun runAction(block: suspend (ServerApi, Long) -> JSONObject) {
+        val userId = settings.userId ?: return
+        if (busy) return
+        busy = true
+        error = null
+        scope.launch {
+            try {
+                val json = block(ServerApi(settings.serverUrl), userId)
+                val characterJson = json.optJSONObject("character") ?: json
+                syncer.save(characterJson)
+                character = GameCharacter.from(characterJson)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error = e.message ?: e.javaClass.simpleName
+            } finally {
+                busy = false
+            }
         }
     }
 
@@ -106,25 +130,24 @@ fun CharacterScreen(resumeKey: Int, modifier: Modifier = Modifier) {
         if (needPermission) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("걸음수 권한이 필요합니다", style = MaterialTheme.typography.titleMedium)
-                    Text("걸음수를 경험치로 바꾸려면 Health Connect 걸음수 읽기를 허용해 주세요.")
+                    Text("운동 기록 권한이 필요합니다", style = MaterialTheme.typography.titleMedium)
+                    Text("러닝 거리를 경험치로 바꾸려면 Health Connect 의 운동·거리 읽기를 허용해 주세요.")
                     Button(onClick = { permissionLauncher.launch(reader.requestPermissions) }) { Text("권한 허용하기") }
                 }
             }
         }
 
         reward?.let { RewardBanner(it) }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         val c = character
         if (c != null) {
             CharacterCard(c)
-            Text("퀘스트", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            c.quests.forEach { QuestCard(it) }
+            StatsCard(c, enabled = !busy) { stat -> runAction { api, id -> api.allocateStat(id, stat) } }
+            EquipmentCard(c, enabled = !busy) { runAction { api, id -> api.enhanceWeapon(id) } }
         } else if (!needPermission && error == null) {
             Text("캐릭터를 불러오는 중...")
         }
-
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -132,10 +155,10 @@ fun CharacterScreen(resumeKey: Int, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (syncing) "동기화 중..." else "마지막 동기화: ${formatTime(lastSyncAt)}",
+                if (busy) "처리 중..." else "마지막 동기화: ${formatTime(lastSyncAt)}",
                 style = MaterialTheme.typography.bodySmall,
             )
-            OutlinedButton(enabled = !syncing, onClick = { scope.launch { syncNow() } }) { Text("지금 동기화") }
+            OutlinedButton(enabled = !busy, onClick = { scope.launch { syncNow() } }) { Text("지금 동기화") }
         }
     }
 }
@@ -159,21 +182,88 @@ private fun CharacterCard(c: GameCharacter) {
                     )
                 }
             }
-            LinearProgressIndicator(
-                progress = { c.levelProgress },
-                modifier = Modifier.fillMaxWidth().height(10.dp),
-            )
+            LinearProgressIndicator(progress = { c.levelProgress }, modifier = Modifier.fillMaxWidth().height(10.dp))
             Text("EXP ${c.expInLevel} / ${c.expToNextLevel}", style = MaterialTheme.typography.bodySmall)
+            LinearProgressIndicator(
+                progress = { c.staminaProgress },
+                modifier = Modifier.fillMaxWidth().height(10.dp),
+                color = MaterialTheme.colorScheme.tertiary,
+            )
+            Text("⚡ 행동력 ${c.stamina} / ${c.maxStamina}  (러닝 1km = 10)", style = MaterialTheme.typography.bodySmall)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("💰 %,d G".format(c.gold), fontWeight = FontWeight.SemiBold)
-                Text("👣 오늘 %,d보".format(c.todaySteps), fontWeight = FontWeight.SemiBold)
+                Text("🏃 오늘 %.2fkm · 이번 주 %.1fkm".format(c.todayKm, c.weekKm), fontWeight = FontWeight.SemiBold)
             }
         }
     }
 }
 
 @Composable
-private fun RewardBanner(r: SyncReward) {
+private fun StatsCard(c: GameCharacter, enabled: Boolean, onAdd: (String) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("능력치", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "남은 포인트 ${c.statPoints}",
+                    color = if (c.statPoints > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            c.stats.forEach { s ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(s.name, modifier = Modifier.weight(1f))
+                    Text(
+                        if (s.bonus > 0) "${s.total}  (${s.base} + 장비 ${s.bonus})" else "${s.total}",
+                        modifier = Modifier.weight(2f),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    OutlinedButton(enabled = enabled && c.statPoints > 0, onClick = { onAdd(s.code) }) { Text("+1") }
+                }
+            }
+            Text("레벨업마다 포인트 3 지급", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun EquipmentCard(c: GameCharacter, enabled: Boolean, onEnhance: () -> Unit) {
+    val w = c.weapon
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("장비", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("⚔️ 무기 +${w.enhance} [${w.gradeName}]  공격력 +${w.attackBonus}", fontWeight = FontWeight.SemiBold)
+            Text("💎 강화석 ${c.enhanceStones}개 (던전 보상)", style = MaterialTheme.typography.bodySmall)
+            if (w.nextCostStones != null && w.nextCostGold != null) {
+                val affordable = c.enhanceStones >= w.nextCostStones && c.gold >= w.nextCostGold
+                Button(enabled = enabled && affordable, onClick = onEnhance) {
+                    Text("강화 +${w.enhance + 1}  (강화석 ${w.nextCostStones} · %,d G)".format(w.nextCostGold))
+                }
+            } else {
+                Text("최대 강화 달성", color = MaterialTheme.colorScheme.primary)
+            }
+
+            HorizontalDivider()
+            Text("장신구 (레이드 보상, 종류별 가장 좋은 것 자동 장착)", style = MaterialTheme.typography.bodySmall)
+            if (c.accessories.isEmpty()) {
+                Text("아직 없음", style = MaterialTheme.typography.bodySmall)
+            }
+            c.accessories.sortedByDescending { it.equipped }.forEach { a ->
+                Text(
+                    (if (a.equipped) "✅ " else "▫️ ") + "${a.gradeName} ${a.typeName}  ${a.statName} +${a.bonus}",
+                    color = if (a.equipped) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RewardBanner(r: RunReward) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -181,33 +271,14 @@ private fun RewardBanner(r: SyncReward) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (r.leveledUp) {
                 Text(
-                    "🎉 레벨 업! Lv.${r.levelBefore} → Lv.${r.levelAfter}",
+                    "🎉 레벨 업! Lv.${r.levelBefore} → Lv.${r.levelAfter} (스탯 포인트 +${r.statPointsGained})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
             }
-            Text("EXP +${r.expGained}" + if (r.goldGained > 0) " · 골드 +${r.goldGained}" else "")
-            r.completedQuests.forEach { Text("✅ 퀘스트 완료: $it", style = MaterialTheme.typography.bodySmall) }
-        }
-    }
-}
-
-@Composable
-private fun QuestCard(q: QuestStatus) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text((if (q.weekly) "[주간] " else "[일일] ") + q.title, fontWeight = FontWeight.SemiBold)
-                Text(
-                    if (q.completed) "완료 ✓" else "%,d / %,d".format(q.progress, q.target),
-                    color = if (q.completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            LinearProgressIndicator(
-                progress = { if (q.completed) 1f else q.fraction },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text("보상: EXP +${q.rewardExp} · ${q.rewardGold} G", style = MaterialTheme.typography.bodySmall)
+            Text("🏃 새 러닝 ${r.newRuns}건 · %.2fkm 반영".format(r.countedKm))
+            Text("EXP +${r.expGained} · 골드 +${r.goldGained} · 행동력 +${r.staminaGained}")
+            r.rejected.forEach { Text("⚠️ 보상 제외: $it", style = MaterialTheme.typography.bodySmall) }
         }
     }
 }

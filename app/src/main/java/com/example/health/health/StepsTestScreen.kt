@@ -41,7 +41,7 @@ private sealed interface StepsUiState {
     data class Error(val message: String) : StepsUiState
 }
 
-/** 삼성헬스(Health Connect) 걸음수 읽기 테스트 화면 */
+/** 개발자 탭: 걸음수 읽기 테스트, 서버 설정, 테스트 데이터 */
 @Composable
 fun StepsTestScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -78,7 +78,8 @@ fun StepsTestScreen(modifier: Modifier = Modifier) {
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("걸음수 읽기 테스트", style = MaterialTheme.typography.headlineSmall)
+        Text("개발자 도구", style = MaterialTheme.typography.headlineSmall)
+        Text("걸음수 읽기 테스트 (게임 보상과 무관)", style = MaterialTheme.typography.titleMedium)
 
         when (val s = state) {
             StepsUiState.Loading -> Text("불러오는 중...")
@@ -113,7 +114,6 @@ fun StepsTestScreen(modifier: Modifier = Modifier) {
 
             is StepsUiState.Loaded -> {
                 LoadedContent(s)
-                SyncSection(reader)
                 TestDataButton(
                     onClick = {
                         scope.launch {
@@ -134,6 +134,9 @@ fun StepsTestScreen(modifier: Modifier = Modifier) {
         }
 
         OutlinedButton(onClick = { scope.launch { refresh() } }) { Text("새로고침") }
+
+        // 서버 설정·러닝 테스트는 걸음수 권한과 상관없이 항상 표시
+        SyncSection()
     }
 }
 

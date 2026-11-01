@@ -1,5 +1,6 @@
 package com.example.health.sync
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,15 +23,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.health.health.StepsReader
+import androidx.health.connect.client.PermissionController
+import com.example.health.health.RunReader
 import kotlinx.coroutines.launch
 
-/** 서버 주소 입력 + 연결 확인 + 걸음수 동기화 */
+/** 서버 주소 입력 + 연결 확인 + 러닝 동기화 + 테스트 러닝 기록 */
 @Composable
-fun SyncSection(reader: StepsReader, modifier: Modifier = Modifier) {
+fun SyncSection(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val reader = remember { RunReader(context.applicationContext) }
     val settings = remember { SyncSettings(context.applicationContext) }
-    val syncer = remember { StepsSyncer(reader, settings) }
+    val syncer = remember { RunSyncer(reader, settings) }
     val scope = rememberCoroutineScope()
 
     var serverUrl by remember { mutableStateOf(settings.serverUrl) }
@@ -55,6 +58,10 @@ fun SyncSection(reader: StepsReader, modifier: Modifier = Modifier) {
             }
         }
     }
+
+    val writePermissionLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract(),
+    ) { }
 
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -90,14 +97,28 @@ fun SyncSection(reader: StepsReader, modifier: Modifier = Modifier) {
                     onClick = {
                         launchAction {
                             val r = syncer.sync()
-                            val match = if (r.serverTotal == r.localTotal) "일치" else "불일치!"
-                            "사용자 #${r.userId} · 최근 ${r.syncedDays}일 동기화 완료\n" +
-                                "앱 %,d걸음 / 서버 저장 %,d걸음 ($match)\n".format(r.localTotal, r.serverTotal) +
-                                "보상 EXP +${r.reward.expGained} · 골드 +${r.reward.goldGained}"
+                            "사용자 #${r.userId} · 러닝 ${r.readRuns}건 읽음 · 새로 반영 ${r.reward.newRuns}건\n" +
+                                "EXP +${r.reward.expGained} · 골드 +${r.reward.goldGained} · 행동력 +${r.reward.staminaGained}" +
+                                r.reward.rejected.joinToString("") { "\n보상 제외: $it" }
                         }
                     },
-                ) { Text("서버로 동기화") }
+                ) { Text("러닝 동기화") }
             }
+
+            OutlinedButton(
+                enabled = !busy,
+                onClick = {
+                    launchAction {
+                        if (!reader.hasWritePermissions()) {
+                            writePermissionLauncher.launch(reader.writePermissions)
+                            "운동·거리 쓰기 권한을 허용한 뒤 다시 눌러 주세요."
+                        } else {
+                            reader.insertTestRun(3.0)
+                            "테스트 러닝 3km(20분)를 기록했습니다. '러닝 동기화'를 눌러 보상을 받으세요."
+                        }
+                    }
+                },
+            ) { Text("[테스트] 러닝 3km 기록") }
 
             if (busy) Text("처리 중...")
             message?.let {

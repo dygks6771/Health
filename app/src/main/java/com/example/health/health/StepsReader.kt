@@ -27,14 +27,8 @@ class StepsReader(private val context: Context) {
 
     val permissions = setOf(HealthPermission.getReadPermission(StepsRecord::class))
 
-    /**
-     * 앱이 꺼져 있을 때(자동 동기화) 걸음수를 읽기 위한 권한.
-     * 지원하지 않는 기기/Health Connect 버전에서는 권한 화면에 나오지 않고 무시된다.
-     */
-    val backgroundPermission = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
-
     /** 처음 권한을 요청할 때 한 번에 묻는 권한들 */
-    val requestPermissions: Set<String> get() = permissions + backgroundPermission
+    val requestPermissions: Set<String> get() = permissions + BACKGROUND_PERMISSION
 
     /** 개발용 테스트 데이터 기록 권한. 읽기 권한과 같이 요청한다 */
     val writePermissions = setOf(HealthPermission.getWritePermission(StepsRecord::class))
@@ -115,6 +109,12 @@ class StepsReader(private val context: Context) {
         client.permissionController.getGrantedPermissions().containsAll(writePermissions)
 
     companion object {
+        /**
+         * 앱이 꺼져 있을 때(자동 동기화) Health Connect 를 읽기 위한 권한.
+         * 지원하지 않는 기기/Health Connect 버전에서는 권한 화면에 나오지 않고 무시된다.
+         */
+        const val BACKGROUND_PERMISSION = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+
         const val SAMSUNG_HEALTH_PACKAGE = "com.sec.android.app.shealth"
         const val HEALTH_CONNECT_PACKAGE = "com.google.android.apps.healthdata"
     }
