@@ -141,6 +141,7 @@ class HeroService(
             },
             equipment = itemRepository.findAllByHeroIdAndEquippedTrue(heroId).map(ItemResponse::from),
             todayKm = runSessionRepository.sumDistanceMeters(heroId, today, today) / 1000.0,
+            todayRewardKm = runSessionRepository.sumCountedMeters(heroId, today, today) / 1000.0,
             weekKm = runSessionRepository.sumDistanceMeters(heroId, weekStart, today) / 1000.0,
         )
     }

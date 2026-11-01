@@ -61,6 +61,9 @@ enum class Region(
     /** 1~10 */
     val tier: Int get() = ordinal + 1
 
+    /** 던전 보스 (전투 장면 표시용): 지역 몬스터 중 가장 강한 마지막 몬스터의 우두머리 */
+    val dungeonBoss: String get() = monsters.last() + " 우두머리"
+
     val dungeonMinLevel: Int get() = 1 + 5 * (tier - 1)
 
     /** 4가지 능력치 합계 최소값 (장비 포함). 고티어일수록 장비가 필요 */

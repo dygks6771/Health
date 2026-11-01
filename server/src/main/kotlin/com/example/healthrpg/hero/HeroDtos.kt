@@ -50,7 +50,10 @@ data class HeroResponse(
     val power: Int,
     val stats: List<StatResponse>,
     val equipment: List<ItemResponse>,
+    /** 오늘 기록된 러닝 거리 (보상 제외된 기록 포함) */
     val todayKm: Double,
+    /** 오늘 실제로 보상받은 거리 (속도 초과·하루 상한 제외) */
+    val todayRewardKm: Double,
     val weekKm: Double,
 )
 

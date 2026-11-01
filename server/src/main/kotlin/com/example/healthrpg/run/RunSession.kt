@@ -63,6 +63,8 @@ class RunSession(
 }
 
 interface RunSessionRepository : JpaRepository<RunSession, Long> {
+    fun findTop20ByHeroIdOrderByStartTimeDesc(heroId: Long): List<RunSession>
+
     fun existsByHeroIdAndExternalId(heroId: Long, externalId: String): Boolean
 
     @Query(

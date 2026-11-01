@@ -86,6 +86,7 @@ enum class Grade(val displayName: String, val multiplier: Double) {
 /** 장비 부위. 부위마다 주 능력치가 정해짐 */
 enum class ItemSlot(val displayName: String, val stat: Stat) {
     WEAPON("무기", Stat.ATTACK),
+    HELMET("투구", Stat.DEFENSE),
     ARMOR("갑옷", Stat.DEFENSE),
     BOOTS("장화", Stat.AGILITY),
     ACCESSORY("목걸이", Stat.SPIRIT),
@@ -130,7 +131,7 @@ object ShopRules {
 /** 상점 뽑기 종류 */
 enum class ShopCategory(val displayName: String, val slots: List<ItemSlot>, val prefix: String) {
     WEAPON("무기", listOf(ItemSlot.WEAPON), "왕국 공방제"),
-    ARMOR("방어구", listOf(ItemSlot.ARMOR, ItemSlot.BOOTS), "왕국 공방제"),
+    ARMOR("방어구", listOf(ItemSlot.HELMET, ItemSlot.ARMOR, ItemSlot.BOOTS), "왕국 공방제"),
 }
 
 object RankingRules {

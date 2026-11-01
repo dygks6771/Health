@@ -20,6 +20,7 @@ import kotlin.random.Random
 
 data class DungeonResponse(
     val name: String,
+    val boss: String,
     val minLevel: Int,
     val minTotalStats: Int,
     val staminaCost: Int,
@@ -44,6 +45,7 @@ data class WorldResponse(val totalStats: Int, val regions: List<RegionResponse>)
 
 data class DungeonResultResponse(
     val dungeon: String,
+    val boss: String,
     val rewardStones: Int,
     val rewardGold: Long,
     val item: ItemResponse?,
@@ -72,6 +74,7 @@ class WorldService(
                     description = region.description,
                     dungeon = DungeonResponse(
                         name = region.dungeonName,
+                        boss = region.dungeonBoss,
                         minLevel = region.dungeonMinLevel,
                         minTotalStats = region.dungeonMinTotalStats,
                         staminaCost = region.dungeonStaminaCost,
@@ -106,6 +109,7 @@ class WorldService(
 
         return DungeonResultResponse(
             dungeon = region.dungeonName,
+            boss = region.dungeonBoss,
             rewardStones = region.dungeonStones,
             rewardGold = region.dungeonGold,
             item = item?.let(ItemResponse::from),

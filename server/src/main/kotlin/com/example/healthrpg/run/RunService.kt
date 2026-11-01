@@ -11,11 +11,13 @@ import jakarta.validation.constraints.PositiveOrZero
 import jakarta.validation.constraints.Size
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 
 data class RunEntry(
     /** Health Connect 기록 ID. 같은 러닝을 두 번 보상하지 않기 위해 사용 */
@@ -50,6 +52,21 @@ data class RunRewardResponse(
 }
 
 data class SyncRunsResponse(val reward: RunRewardResponse, val hero: HeroResponse)
+
+data class RunHistoryEntry(
+    val runDate: LocalDate,
+    val startTime: Instant,
+    val endTime: Instant,
+    val distanceKm: Double,
+    /** 보상에 반영된 거리 */
+    val countedKm: Double,
+    val expAwarded: Int,
+    val goldAwarded: Int,
+    val staminaAwarded: Int,
+    val rejectedReason: String?,
+)
+
+data class RunHistoryResponse(val runs: List<RunHistoryEntry>)
 
 /** Health Connect 러닝 기록 → 경험치, 골드, 행동력 */
 @Service
@@ -140,7 +157,33 @@ class RunService(
 }
 
 @RestController
-class RunController(private val runService: RunService) {
+class RunController(
+    private val runService: RunService,
+    private val heroService: HeroService,
+    private val runSessionRepository: RunSessionRepository,
+) {
+    /** 최근 러닝 기록 20건과 각 기록의 보상 (보상이 빠졌다면 이유 포함) */
+    @GetMapping("/api/me/runs")
+    @Transactional(readOnly = true)
+    fun history(@LoginAccount accountId: Long): RunHistoryResponse {
+        val hero = heroService.require(accountId)
+        return RunHistoryResponse(
+            runSessionRepository.findTop20ByHeroIdOrderByStartTimeDesc(hero.id!!).map {
+                RunHistoryEntry(
+                    runDate = it.runDate,
+                    startTime = it.startTime,
+                    endTime = it.endTime,
+                    distanceKm = it.distanceMeters / 1000.0,
+                    countedKm = it.countedMeters / 1000.0,
+                    expAwarded = it.expAwarded,
+                    goldAwarded = it.goldAwarded,
+                    staminaAwarded = it.staminaAwarded,
+                    rejectedReason = it.rejectedReason,
+                )
+            },
+        )
+    }
+
     /** 러닝 기록 동기화 → 보상 + 영웅 상태 */
     @PostMapping("/api/me/runs")
     fun sync(@LoginAccount accountId: Long, @Valid @RequestBody request: SyncRunsRequest): SyncRunsResponse =

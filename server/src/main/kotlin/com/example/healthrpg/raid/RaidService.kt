@@ -3,6 +3,7 @@ package com.example.healthrpg.raid
 import com.example.healthrpg.auth.LoginAccount
 import com.example.healthrpg.common.BadRequestException
 import com.example.healthrpg.friend.FriendService
+import com.example.healthrpg.game.Job
 import com.example.healthrpg.game.RaidBoss
 import com.example.healthrpg.game.RaidGrade
 import com.example.healthrpg.game.RaidStage
@@ -58,7 +59,13 @@ data class RaidTurn(
     val evolved: Boolean,
 )
 
-data class RaidMemberResult(val name: String, val jobName: String, val damage: Long)
+data class RaidMemberResult(
+    val name: String,
+    val job: Job,
+    val jobName: String,
+    val appearance: Int,
+    val damage: Long,
+)
 
 data class RaidResultResponse(
     val totalDamage: Long,
@@ -152,7 +159,7 @@ class RaidService(
             finalStageName = stage.name,
             grade = grade.grade,
             turns = turns,
-            members = party.mapIndexed { i, m -> RaidMemberResult(m.name, m.job.displayName, memberDamage[i]) },
+            members = party.mapIndexed { i, m -> RaidMemberResult(m.name, m.job, m.job.displayName, m.appearance, memberDamage[i]) },
             rewardGold = grade.gold,
             rewardStones = grade.stones,
             item = item?.let(ItemResponse::from),
