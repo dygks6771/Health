@@ -29,6 +29,7 @@ import com.example.health.game.RegionInfo
 import com.example.health.net.ApiClient
 import com.example.health.ui.battle.BattleOverlay
 import com.example.health.ui.battle.BattleSpec
+import com.example.health.ui.battle.ChestInfo
 import com.example.health.ui.battle.Fighter
 import com.example.health.ui.battle.simpleBattle
 import com.example.health.ui.fantasy.ActionFeedback
@@ -100,24 +101,40 @@ fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                 actions.run {
                     val json = api.dungeon(region.tier)
                     onHeroJson(json.getJSONObject("hero"))
+                    val victory = json.getBoolean("victory")
+                    val chestJson = json.optJSONObject("chest")
                     val r = DungeonResult(
                         dungeon = json.getString("dungeon"),
                         stones = json.getInt("rewardStones"),
                         gold = json.getLong("rewardGold"),
                         item = if (json.isNull("item")) null else ItemInfo.from(json.getJSONObject("item")),
                     )
-                    result = r
+                    result = r.takeIf { victory }
                     battle = simpleBattle(
                         title = "던전: ${region.dungeonName}",
                         hero = Fighter(hero.name, HeroSprites.hero(hero.job, hero.appearance)),
                         enemy = Fighter(region.boss, MonsterSprites.monster(region.boss)),
                         enemyHp = region.minTotalStats * 40L + 500,
                         hits = 6,
-                        resultTitle = "🏆 ${r.dungeon} 공략 성공!",
-                        resultLines = listOf(
-                            "강화석 +${r.stones} · 골드 +${r.gold}",
-                            r.item?.let { "획득: [${it.gradeName}] ${it.displayName} (${it.statText})" } ?: "이번에는 장비가 나오지 않았습니다",
-                        ),
+                        resultTitle = if (victory) "🏆 ${r.dungeon} 공략 성공!" else "${r.dungeon} 공략 실패",
+                        resultLines = if (victory) {
+                            listOf("${region.boss} 처치!")
+                        } else {
+                            listOf("승률 ${json.getInt("winChance")}% 에서 패배했습니다", "행동력만 소모 · 능력치를 올리면 승률이 오릅니다")
+                        },
+                        victory = victory,
+                        chest = chestJson?.let {
+                            ChestInfo(
+                                it.getString("tier"),
+                                it.getString("name"),
+                                listOf(
+                                    "강화석 +${r.stones}",
+                                    "골드 +${r.gold}",
+                                    r.item?.let { item -> "획득: [${item.gradeName}] ${item.displayName} (${item.statText})" }
+                                        ?: "장비는 나오지 않았습니다",
+                                ),
+                            )
+                        },
                         enemySize = 170.dp,
                         heroMaxHp = hero.power * 2L,
                         heroLoss = (region.minTotalStats.toFloat() / hero.totalStats.coerceAtLeast(1) * 0.75f).coerceIn(0.15f, 0.9f),
@@ -146,7 +163,10 @@ private fun RegionCard(region: RegionInfo, enabled: Boolean, onEnter: () -> Unit
         }
         Text("⚔ 던전: ${region.dungeonName} · 보스 ${region.boss}" + if (region.clears > 0) "  (공략 ${region.clears}회)" else "", color = Parchment, fontWeight = FontWeight.SemiBold)
         Text("입장 조건: Lv.${region.minLevel} · 능력치 합 ${region.minTotalStats} · 행동력 ${region.staminaCost}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
-        Text("보상: 강화석 ${region.rewardStones} · 골드 ${region.rewardGold} · 장비 ${region.dropRate}%", color = Gold, style = MaterialTheme.typography.bodySmall)
+        Text("기본 보상: 강화석 ${region.rewardStones} · 골드 ${region.rewardGold} · 장비 (상자 등급에 따라 50~100%)", color = Gold, style = MaterialTheme.typography.bodySmall)
+        if (region.available) {
+            Text("승률 ${region.winChance}%", color = if (region.winChance >= 90) GoldBright else if (region.winChance >= 70) Gold else Crimson, fontWeight = FontWeight.Bold)
+        }
         Text("장비 등급: ${region.dropGrades}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
         if (!region.available) {
             Text("부족: " + region.reasons.joinToString(", "), color = Crimson, style = MaterialTheme.typography.bodySmall)

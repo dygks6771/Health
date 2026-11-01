@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.example.health.ui.fantasy.gradeColor
+import com.example.health.game.ItemInfo
+import com.example.health.net.ApiClient
+import com.example.health.ui.battle.ChestInfo
+import com.example.health.ui.battle.ChestReveal
 import com.example.health.ui.sprites.HeroAvatar
 import com.example.health.ui.sprites.ItemIcon
 import androidx.compose.foundation.border
@@ -94,6 +98,9 @@ fun LobbyScreen(
     val context = LocalContext.current
     val reader = remember { RunReader(context.applicationContext) }
     val syncer = remember { RunSyncer(reader, session) }
+    val api = remember { ApiClient(session) }
+    var dailyClaimed by remember { mutableStateOf(true) }
+    var dailyChest by remember { mutableStateOf<ChestInfo?>(null) }
     val scope = rememberCoroutineScope()
 
     var reward by remember { mutableStateOf<RunReward?>(null) }
@@ -137,7 +144,10 @@ fun LobbyScreen(
         PermissionController.createRequestPermissionResultContract(),
     ) { scope.launch { syncNow() } }
 
-    LaunchedEffect(resumeKey) { syncNow() }
+    LaunchedEffect(resumeKey) {
+        runCatching { dailyClaimed = api.dailyStatus().getBoolean("claimedToday") }
+        syncNow()
+    }
 
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -165,6 +175,40 @@ fun LobbyScreen(
                         .clickable { menuOpen = true }
                         .padding(horizontal = 10.dp, vertical = 2.dp),
                 )
+            }
+
+            if (!dailyClaimed) {
+                Panel(title = "🎁 오늘의 출석 보상", highlight = true) {
+                    Text("하루 한 번 보물 상자를 열 수 있어요. 황금 상자에는 장비가 들어 있습니다!", color = Parchment, style = MaterialTheme.typography.bodySmall)
+                    GoldButton(
+                        "상자 받기",
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val json = api.claimDaily()
+                                    onHeroJson(json.getJSONObject("hero"))
+                                    val chest = json.getJSONObject("chest")
+                                    val item = json.optJSONObject("item")?.let { ItemInfo.from(it) }
+                                    dailyClaimed = true
+                                    dailyChest = ChestInfo(
+                                        chest.getString("tier"),
+                                        chest.getString("name"),
+                                        listOfNotNull(
+                                            "골드 +${json.getLong("gold")}",
+                                            "강화석 +${json.getInt("stones")}",
+                                            item?.let { "획득: [${it.gradeName}] ${it.displayName}" },
+                                        ),
+                                    )
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    syncError = e.message
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
 
             HeroPanel(hero)
@@ -207,6 +251,19 @@ fun LobbyScreen(
         }
 
         QuickBar(modifier = Modifier.align(Alignment.BottomCenter), onNavigate = onNavigate)
+
+        dailyChest?.let { chest ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.8f))
+                    .clickable(onClick = {})
+                    .padding(20.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                ChestReveal(chest, onDone = { dailyChest = null })
+            }
+        }
 
         if (menuOpen) {
             MenuOverlay(

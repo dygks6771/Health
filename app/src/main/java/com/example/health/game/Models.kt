@@ -40,6 +40,8 @@ data class ItemInfo(
     val nextEnhanceRate: Int?,
     val nextEnhanceStones: Int?,
     val nextEnhanceGold: Long?,
+    /** 다음 강화 실패 시 떨어지는 단계 */
+    val failDrop: Int,
 ) {
     /** 예: "+3 숲지기의 대검" */
     val displayName: String get() = (if (enhance > 0) "+$enhance " else "") + name
@@ -66,6 +68,7 @@ data class ItemInfo(
             nextEnhanceRate = j.intOrNull("nextEnhanceRate"),
             nextEnhanceStones = j.intOrNull("nextEnhanceStones"),
             nextEnhanceGold = j.longOrNull("nextEnhanceGold"),
+            failDrop = j.optInt("failDrop", 0),
         )
 
         fun listFrom(a: JSONArray): List<ItemInfo> = a.mapObjects(::from)
@@ -232,12 +235,15 @@ data class HuntInfo(
     val cleared: Boolean,
     val available: Boolean,
     val reasons: List<String>,
+    /** 승률 % */
+    val winChance: Int,
 ) {
     companion object {
         fun from(j: JSONObject) = HuntInfo(
             j.getInt("slot"), j.getString("difficulty"), j.getString("difficultyName"), j.getString("monster"),
             j.getString("regionName"), j.getInt("targetLevel"), j.getInt("requiredPower"), j.getInt("rewardGold"),
             j.getInt("staminaCost"), j.getBoolean("cleared"), j.getBoolean("available"), j.getJSONArray("reasons").strings(),
+            j.optInt("winChance", 100),
         )
     }
 }
@@ -264,6 +270,7 @@ data class RegionInfo(
     val clears: Long,
     val available: Boolean,
     val reasons: List<String>,
+    val winChance: Int,
 ) {
     companion object {
         fun listFrom(j: JSONObject): List<RegionInfo> = j.getJSONArray("regions").mapObjects {
@@ -284,6 +291,7 @@ data class RegionInfo(
                 clears = d.getLong("clears"),
                 available = d.getBoolean("available"),
                 reasons = d.getJSONArray("reasons").strings(),
+                winChance = d.optInt("winChance", 100),
             )
         }
     }
@@ -350,6 +358,10 @@ data class RaidResult(
     val finalStage: Int,
     val finalStageName: String,
     val grade: String,
+    val victory: Boolean,
+    /** WOOD / SILVER / GOLD */
+    val chestTier: String,
+    val chestName: String,
     val turns: List<RaidTurnInfo>,
     val members: List<RaidMember>,
     val rewardGold: Long,
@@ -363,6 +375,9 @@ data class RaidResult(
             finalStage = j.getInt("finalStage"),
             finalStageName = j.getString("finalStageName"),
             grade = j.getString("grade"),
+            victory = j.optBoolean("victory", true),
+            chestTier = j.optJSONObject("chest")?.optString("tier") ?: "WOOD",
+            chestName = j.optJSONObject("chest")?.optString("name") ?: "나무 상자",
             turns = j.getJSONArray("turns").mapObjects {
                 RaidTurnInfo(
                     it.getInt("turn"), it.getLong("damage"), it.getLong("totalDamage"),

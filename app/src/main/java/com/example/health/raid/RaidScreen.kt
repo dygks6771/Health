@@ -35,6 +35,7 @@ import com.example.health.net.ApiClient
 import com.example.health.ui.battle.BattleOverlay
 import com.example.health.ui.battle.BattleRound
 import com.example.health.ui.battle.BattleSpec
+import com.example.health.ui.battle.ChestInfo
 import com.example.health.ui.battle.Fighter
 import com.example.health.ui.fantasy.ActionFeedback
 import com.example.health.ui.sprites.HeroSprites
@@ -240,12 +241,19 @@ private fun raidBattle(r: RaidResult, info: RaidInfo): BattleSpec {
         enemy = Fighter(info.bossName, DragonSprite.stage(1)),
         enemySize = 180.dp,
         rounds = rounds,
-        resultTitle = "레이드 결과: ${r.grade} 등급",
-        resultLines = listOfNotNull(
-            "총 데미지 %,d · 최종 ${r.finalStage}단계 ${r.finalStageName}".format(r.totalDamage),
-            "골드 +${r.rewardGold} · 강화석 +${r.rewardStones}",
-            r.item?.let { "획득: [${it.gradeName}] ${it.displayName} (${it.statText})" },
-        ),
+        resultTitle = if (r.victory) "레이드 결과: ${r.grade} 등급" else "레이드 실패: F 등급",
+        resultLines = listOf("총 데미지 %,d · 최종 ${r.finalStage}단계 ${r.finalStageName}".format(r.totalDamage)) +
+            if (r.victory) emptyList() else listOf("참가 보상: 골드 +${r.rewardGold} · 강화석 +${r.rewardStones}"),
+        victory = r.victory,
+        chest = ChestInfo(
+            r.chestTier,
+            r.chestName,
+            listOfNotNull(
+                "골드 +${r.rewardGold}",
+                "강화석 +${r.rewardStones}",
+                r.item?.let { "획득: [${it.gradeName}] ${it.displayName} (${it.statText})" },
+            ),
+        ).takeIf { r.victory },
     )
 }
 

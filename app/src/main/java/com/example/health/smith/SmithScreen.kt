@@ -65,7 +65,7 @@ fun SmithScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ScreenHeader("대장간", onBack)
-        NpcBanner(NpcSprites.blacksmith, "좋은 쇠는 두드릴수록 강해지는 법이지. 다만 운도 따라야 하네. 실패해도 단계는 지켜 주지!")
+        NpcBanner(NpcSprites.blacksmith, "+25 까지 두드려 주지. 다만 +5 부터는 실패하면 쇠가 상해 단계가 떨어지네. 높을수록 더 크게!")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ResourceChip("💎", "강화석 ${hero.enhanceStones}")
             ResourceChip("💰", "%,d".format(hero.gold))
@@ -87,10 +87,16 @@ fun SmithScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                 val stones = selected.nextEnhanceStones
                 val gold = selected.nextEnhanceGold
                 if (rate == null || stones == null || gold == null) {
-                    Text("✦ 최대 강화(+15) 달성", color = Gold, fontWeight = FontWeight.Bold)
+                    Text("✦ 최대 강화(+25) 달성", color = Gold, fontWeight = FontWeight.Bold)
                 } else {
                     Text("+${selected.enhance} → +${selected.enhance + 1}   성공률 $rate%", color = if (rate >= 70) Emerald else Crimson, fontWeight = FontWeight.Bold)
-                    Text("비용: 강화석 $stones · 골드 %,d   (실패해도 단계 유지)".format(gold), color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                    Text("비용: 강화석 $stones · 골드 %,d".format(gold), color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        if (selected.failDrop > 0) "⚠ 실패하면 -${selected.failDrop}강 (+${selected.enhance - selected.failDrop} 로 하락)" else "실패해도 단계 유지",
+                        color = if (selected.failDrop > 0) Crimson else Emerald,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                     GoldButton(
                         "강화하기",
                         onClick = {
@@ -98,8 +104,11 @@ fun SmithScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                                 val json = api.enhance(selected.id)
                                 onHeroJson(json.getJSONObject("hero"))
                                 load()
-                                if (json.getBoolean("success")) "🔨 강화 성공! +${json.getInt("enhanceAfter")}"
-                                else "💥 강화 실패... (+${json.getInt("enhanceBefore")} 유지)"
+                                when {
+                                    json.getBoolean("success") -> "🔨 강화 성공! +${json.getInt("enhanceAfter")}"
+                                    json.getInt("dropped") > 0 -> "💥 강화 실패... +${json.getInt("enhanceBefore")} → +${json.getInt("enhanceAfter")}"
+                                    else -> "💥 강화 실패... (+${json.getInt("enhanceBefore")} 유지)"
+                                }
                             }
                         },
                         enabled = !actions.busy && hero.enhanceStones >= stones && hero.gold >= gold,

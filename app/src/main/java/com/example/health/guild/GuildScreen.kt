@@ -32,6 +32,7 @@ import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.fantasy.rememberActions
 import com.example.health.ui.battle.BattleOverlay
 import com.example.health.ui.battle.BattleSpec
+import com.example.health.ui.battle.ChestInfo
 import com.example.health.ui.battle.Fighter
 import com.example.health.ui.battle.simpleBattle
 import com.example.health.ui.sprites.HeroSprites
@@ -79,14 +80,31 @@ fun GuildScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                 actions.run {
                     val json = api.hunt(hunt.slot)
                     onHeroJson(json.getJSONObject("hero"))
+                    val victory = json.getBoolean("victory")
+                    val chest = json.optJSONObject("chest")
                     battle = simpleBattle(
                         title = "토벌: ${hunt.monster}",
                         hero = Fighter(hero.name, HeroSprites.hero(hero.job, hero.appearance)),
                         enemy = Fighter("Lv.${hunt.targetLevel} ${hunt.monster}", MonsterSprites.monster(hunt.monster)),
                         enemyHp = hunt.requiredPower * 3L,
                         hits = if (hunt.difficulty == "HARD") 5 else 4,
-                        resultTitle = "🏆 토벌 성공!",
-                        resultLines = listOf("${hunt.monster} 토벌 완료", "골드 +${json.getInt("rewardGold")}"),
+                        resultTitle = if (victory) "🏆 토벌 성공!" else "토벌 실패",
+                        resultLines = if (victory) {
+                            listOf("${hunt.monster} 토벌 완료")
+                        } else {
+                            listOf("승률 ${json.getInt("winChance")}% 에서 패배했습니다", "행동력만 소모 · 의뢰는 다시 도전할 수 있어요")
+                        },
+                        victory = victory,
+                        chest = chest?.let {
+                            ChestInfo(
+                                it.getString("tier"),
+                                it.getString("name"),
+                                listOfNotNull(
+                                    "골드 +${json.getInt("rewardGold")}",
+                                    json.getInt("rewardStones").takeIf { s -> s > 0 }?.let { s -> "강화석 +$s" },
+                                ),
+                            )
+                        },
                         heroMaxHp = hero.power * 2L,
                         // 권장 전투력이 내 전투력에 가까울수록 많이 맞음 (도전 의뢰는 아슬아슬하게)
                         heroLoss = (hunt.requiredPower.toFloat() / hero.power.coerceAtLeast(1) * 0.7f).coerceIn(0.1f, 0.9f),
@@ -119,7 +137,18 @@ private fun HuntCard(hunt: HuntInfo, enabled: Boolean, onHunt: () -> Unit) {
             if (hunt.cleared) Text("완료 ✓", color = Emerald, fontWeight = FontWeight.Bold)
         }
         Text("출몰 지역: ${hunt.regionName} · 적 레벨 ${hunt.targetLevel}", color = Parchment, style = MaterialTheme.typography.bodySmall)
-        Text("권장 전투력 ${hunt.requiredPower} · 보상 골드 ${hunt.rewardGold}", color = Gold, style = MaterialTheme.typography.bodySmall)
+        Text("권장 전투력 ${hunt.requiredPower} · 기본 보상 골드 ${hunt.rewardGold}", color = Gold, style = MaterialTheme.typography.bodySmall)
+        if (!hunt.cleared) {
+            Text(
+                "승률 ${hunt.winChance}%",
+                color = when {
+                    hunt.winChance >= 90 -> Emerald
+                    hunt.winChance >= 60 -> Gold
+                    else -> Crimson
+                },
+                fontWeight = FontWeight.Bold,
+            )
+        }
         if (!hunt.available && !hunt.cleared) {
             Text("부족: " + hunt.reasons.joinToString(", "), color = Crimson, style = MaterialTheme.typography.bodySmall)
         }

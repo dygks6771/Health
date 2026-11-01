@@ -79,6 +79,9 @@ data class BattleSpec(
     val rounds: List<BattleRound>,
     val resultTitle: String,
     val resultLines: List<String>,
+    val victory: Boolean = true,
+    /** 승리 보상 상자 (있으면 결과 뒤에 상자 열기) */
+    val chest: ChestInfo? = null,
 )
 
 /**
@@ -102,6 +105,7 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
     var damageText by remember { mutableStateOf("") }
     var caption by remember { mutableStateOf<String?>(null) }
     var finished by remember { mutableStateOf(false) }
+    var chestOpen by remember { mutableStateOf(false) }
     val shownHp by animateFloatAsState(enemyHp, tween(300), label = "hp")
 
     fun skip() {
@@ -249,9 +253,19 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
             caption?.let { Text(it, color = GoldBright, fontWeight = FontWeight.Bold) }
 
             if (finished) {
-                Panel(title = spec.resultTitle, highlight = true) {
-                    spec.resultLines.forEach { Text(it, color = if (it.startsWith("획득")) Emerald else Parchment) }
-                    GoldButton("확인", onClick = onClose, modifier = Modifier.fillMaxWidth())
+                val chest = spec.chest
+                if (chestOpen && chest != null) {
+                    ChestReveal(chest, onDone = onClose)
+                } else {
+                    Panel(title = spec.resultTitle, highlight = spec.victory) {
+                        if (!spec.victory) Text("💀 패배...", color = Crimson, style = MaterialTheme.typography.headlineSmall)
+                        spec.resultLines.forEach { Text(it, color = if (it.startsWith("획득")) Emerald else Parchment) }
+                        if (spec.victory && chest != null) {
+                            GoldButton("🎁 ${chest.name} 열기", onClick = { chestOpen = true }, modifier = Modifier.fillMaxWidth())
+                        } else {
+                            GoldButton("확인", onClick = onClose, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
                 }
             } else {
                 GhostButton("건너뛰기 ▶▶", onClick = { skip() }, modifier = Modifier.fillMaxWidth())
@@ -262,8 +276,9 @@ fun BattleOverlay(spec: BattleSpec, onClose: () -> Unit) {
 }
 
 /**
- * 적 체력을 [hits] 번에 나눠 깎는 전투 (토벌·던전). 영웅이 공격하면 적이 반격한다.
- * [heroLoss] (0~0.9) 는 전투가 끝났을 때 잃은 체력 비율 — 적이 강할수록 크게. 결과는 항상 승리.
+ * 토벌·던전 전투 장면 만들기. 영웅이 공격하면 적이 반격한다.
+ * 승리: 적 체력을 [hits] 번에 모두 깎고, 영웅은 [heroLoss] (0~0.9) 만큼만 잃는다.
+ * 패배: 적 체력을 절반쯤 깎다가 영웅이 쓰러진다.
  */
 fun simpleBattle(
     title: String,
@@ -275,40 +290,57 @@ fun simpleBattle(
     resultLines: List<String>,
     heroMaxHp: Long,
     heroLoss: Float,
+    victory: Boolean = true,
+    chest: ChestInfo? = null,
     enemySize: Dp = 140.dp,
     seed: Int = 0,
 ): BattleSpec {
     val random = kotlin.random.Random(seed)
-    // 무작위 비율로 나눈 뒤 합이 정확히 enemyHp 가 되도록 마지막 타격에서 맞춤
-    val weights = List(hits) { 0.7 + random.nextDouble() * 0.6 }
-    val counters = (hits - 1).coerceAtLeast(1)
-    val totalHeroDamage = (heroMaxHp * heroLoss.coerceIn(0.05f, 0.9f)).toLong()
-    var remaining = enemyHp
+    val heroHits = hits.coerceAtLeast(1)
+    val enemyHits = if (victory) (heroHits - 1).coerceAtLeast(1) else heroHits
+    val dealt = if (victory) enemyHp else (enemyHp * (0.4 + random.nextDouble() * 0.3)).toLong()
+    val taken = if (victory) (heroMaxHp * heroLoss.coerceIn(0.05f, 0.9f)).toLong() else heroMaxHp
+
+    /** [total] 을 [n] 번으로 무작위 분배 (합이 정확히 total) */
+    fun split(total: Long, n: Int): List<Long> {
+        val weights = List(n) { 0.7 + random.nextDouble() * 0.6 }
+        var left = total
+        return weights.mapIndexed { i, w ->
+            val part = if (i == n - 1) left else (total * w / weights.sum()).toLong().coerceIn(0L, left)
+            left -= part
+            part
+        }
+    }
+
+    val heroDamage = split(dealt, heroHits)
+    val enemyDamage = split(taken, enemyHits)
+    var enemyLeft = enemyHp
     var heroLeft = heroMaxHp
     val rounds = mutableListOf<BattleRound>()
-    weights.forEachIndexed { i, w ->
-        val damage = if (i == hits - 1) remaining else (enemyHp * w / weights.sum()).toLong().coerceAtMost(remaining)
-        remaining -= damage
-        val last = i == hits - 1
+    for (i in 0 until heroHits) {
+        enemyLeft -= heroDamage[i]
+        val kills = victory && i == heroHits - 1
         rounds += BattleRound(
             attacker = 0,
-            damage = damage,
-            crit = w > 1.15,
-            enemyHpAfter = remaining.toFloat() / enemyHp,
-            caption = if (last) "${enemy.name} 을(를) 쓰러뜨렸다!" else null,
+            damage = heroDamage[i],
+            crit = heroDamage[i] > dealt / heroHits * 1.15,
+            enemyHpAfter = enemyLeft.toFloat() / enemyHp,
+            caption = if (kills) "${enemy.name} 을(를) 쓰러뜨렸다!" else null,
         )
-        if (!last) {
-            val hit = (totalHeroDamage / counters * (0.8 + random.nextDouble() * 0.4)).toLong().coerceIn(0L, (heroLeft - 1).coerceAtLeast(0L))
+        if (i < enemyHits && !kills) {
+            val lastBlow = !victory && i == enemyHits - 1
+            // 승리하는 전투에서는 영웅이 쓰러지지 않도록 체력 1 이상 남김
+            val hit = if (lastBlow) heroLeft else enemyDamage[i].coerceIn(0L, (heroLeft - 1).coerceAtLeast(0L))
             heroLeft -= hit
             rounds += BattleRound(
                 attacker = 0,
                 damage = hit,
-                enemyHpAfter = remaining.toFloat() / enemyHp,
+                enemyHpAfter = enemyLeft.toFloat() / enemyHp,
                 enemyAttack = true,
                 heroHpAfter = heroLeft.toFloat() / heroMaxHp,
-                caption = "${enemy.name}의 반격!",
+                caption = if (lastBlow) "${hero.name} 이(가) 쓰러졌다..." else "${enemy.name}의 반격!",
             )
         }
     }
-    return BattleSpec(title, listOf(hero), enemy, enemySize, rounds, resultTitle, resultLines)
+    return BattleSpec(title, listOf(hero), enemy, enemySize, rounds, resultTitle, resultLines, victory, chest)
 }

@@ -81,6 +81,10 @@ class ApiClient(private val session: Session) {
     suspend fun sell(itemId: Long): JSONObject = obj("POST", "/api/me/items/$itemId/sell")
     suspend fun enhance(itemId: Long): JSONObject = obj("POST", "/api/me/smith/$itemId/enhance")
 
+    // ── 출석 보상 ──
+    suspend fun dailyStatus(): JSONObject = obj("GET", "/api/me/daily")
+    suspend fun claimDaily(): JSONObject = obj("POST", "/api/me/daily/claim")
+
     // ── 상점 ──
     suspend fun shop(): JSONObject = obj("GET", "/api/me/shop")
 
