@@ -80,6 +80,18 @@ class RunRewardTest(
     }
 
     @Test
+    fun `daily reward chest once a day`() {
+        val token = api.signup()
+        api.createHero(token)
+        api.get(token, "/api/me/daily").andExpect { jsonPath("$.claimedToday") { value(false) } }
+        val claim = api.json(api.post(token, "/api/me/daily/claim").andExpect { status { isOk() } })
+        assertTrue(claim["gold"].asLong() >= 100)
+        assertTrue(claim["chest"]["name"].asString().endsWith("상자"))
+        api.post(token, "/api/me/daily/claim").andExpect { status { isBadRequest() } }
+        api.get(token, "/api/me/daily").andExpect { jsonPath("$.claimedToday") { value(true) } }
+    }
+
+    @Test
     fun `bulk sell removes only unequipped items up to the grade`() {
         val token = api.signup()
         val weaponId = api.createHero(token)["equipment"][0]["id"].asLong()

@@ -3,6 +3,8 @@ package com.example.healthrpg.raid
 import com.example.healthrpg.auth.LoginAccount
 import com.example.healthrpg.common.BadRequestException
 import com.example.healthrpg.friend.FriendService
+import com.example.healthrpg.game.ChestResponse
+import com.example.healthrpg.game.ChestTier
 import com.example.healthrpg.game.Job
 import com.example.healthrpg.game.RaidBoss
 import com.example.healthrpg.game.RaidGrade
@@ -72,6 +74,9 @@ data class RaidResultResponse(
     val finalStage: Int,
     val finalStageName: String,
     val grade: String,
+    /** F 등급은 패배 */
+    val victory: Boolean,
+    val chest: ChestResponse,
     val turns: List<RaidTurn>,
     val members: List<RaidMemberResult>,
     val rewardGold: Long,
@@ -147,8 +152,16 @@ class RaidService(
         }
 
         val grade = RaidBoss.gradeFor(total)
-        hero.gold += grade.gold
-        hero.enhanceStones += grade.stones
+        // 등급이 높을수록 좋은 상자: S·A 황금, B·C 은, 그 외 나무
+        val chest = when (grade.grade) {
+            "S", "A" -> ChestTier.GOLD
+            "B", "C" -> ChestTier.SILVER
+            else -> ChestTier.WOOD
+        }
+        val gold = (grade.gold * chest.multiplier).toLong()
+        val stones = (grade.stones * chest.multiplier).toInt() + chest.bonusStones
+        hero.gold += gold
+        hero.enhanceStones += stones
         val tier = (party.map { it.level }.average().toInt() / 5 + 1).coerceIn(1, 10)
         val item = grade.itemGrade?.let { itemFactory.raidReward(hero, tier, it) }
         raidRecordRepository.save(RaidRecord(hero, total, stage.stage, grade.grade, party.joinToString(",") { it.name }))
@@ -158,10 +171,12 @@ class RaidService(
             finalStage = stage.stage,
             finalStageName = stage.name,
             grade = grade.grade,
+            victory = grade.grade != "F",
+            chest = ChestResponse.of(chest),
             turns = turns,
             members = party.mapIndexed { i, m -> RaidMemberResult(m.name, m.job, m.job.displayName, m.appearance, memberDamage[i]) },
-            rewardGold = grade.gold,
-            rewardStones = grade.stones,
+            rewardGold = gold,
+            rewardStones = stones,
             item = item?.let(ItemResponse::from),
             hero = heroService.response(hero),
         )

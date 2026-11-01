@@ -103,6 +103,8 @@ class GameApiTest(
         val slot = hunts[easy]["slot"].asInt()
         api.post(token, "/api/me/guild/hunts/$slot").andExpect {
             status { isOk() }
+            jsonPath("$.victory") { value(true) }
+            jsonPath("$.winChance") { value(100) }
             jsonPath("$.hero.stamina") { value(40) }
         }
         api.post(token, "/api/me/guild/hunts/$slot").andExpect {
@@ -123,12 +125,13 @@ class GameApiTest(
         assertEquals("초보자 마을", world["regions"][0]["name"].asString())
         assertTrue(world["regions"][0]["dungeon"]["available"].asBoolean())
 
-        api.post(token, "/api/me/world/1/dungeon").andExpect {
-            status { isOk() }
-            jsonPath("$.rewardStones") { value(2) }
-            jsonPath("$.hero.enhanceStones") { value(2) }
-            jsonPath("$.hero.stamina") { value(30) }
-        }
+        // 능력치가 최소치의 1.5배 이상이면 승률 100%. 보상은 상자 등급에 따라 기본(강화석 2) 이상
+        val cleared = api.json(api.post(token, "/api/me/world/1/dungeon").andExpect { status { isOk() } })
+        assertEquals(true, cleared["victory"].asBoolean())
+        assertEquals(100, cleared["winChance"].asInt())
+        assertTrue(cleared["rewardStones"].asInt() >= 2)
+        assertEquals(cleared["rewardStones"].asInt(), cleared["hero"]["enhanceStones"].asInt())
+        assertEquals(30, cleared["hero"]["stamina"].asInt())
         api.post(token, "/api/me/world/2/dungeon").andExpect {
             status { isBadRequest() }
             jsonPath("$.message") { value("레벨 6 필요, 능력치 합계 44 필요") }
@@ -145,11 +148,12 @@ class GameApiTest(
         api.post(token, "/api/me/world/1/dungeon")
 
         // +0 → +1 은 성공률 100%: 강화석 1, 골드 30
+        val stones = api.json(api.get(token, "/api/me/hero"))["enhanceStones"].asInt()
         api.post(token, "/api/me/smith/$weaponId/enhance").andExpect {
             status { isOk() }
             jsonPath("$.success") { value(true) }
             jsonPath("$.item.enhance") { value(1) }
-            jsonPath("$.hero.enhanceStones") { value(1) }
+            jsonPath("$.hero.enhanceStones") { value(stones - 1) }
         }
 
         api.post(token, "/api/me/items/$weaponId/sell").andExpect { status { isBadRequest() } }

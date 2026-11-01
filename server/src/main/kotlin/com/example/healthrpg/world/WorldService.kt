@@ -3,6 +3,9 @@ package com.example.healthrpg.world
 import com.example.healthrpg.auth.LoginAccount
 import com.example.healthrpg.common.BadRequestException
 import com.example.healthrpg.common.NotFoundException
+import com.example.healthrpg.game.BattleRules
+import com.example.healthrpg.game.ChestResponse
+import com.example.healthrpg.game.ChestTier
 import com.example.healthrpg.game.Grade
 import com.example.healthrpg.game.Region
 import com.example.healthrpg.hero.Hero
@@ -30,6 +33,8 @@ data class DungeonResponse(
     /** 예: "일반 70% · 고급 25% · 희귀 5%" */
     val dropGrades: String,
     val clears: Long,
+    /** 입장 가능할 때 승률 % */
+    val winChance: Int,
     val available: Boolean,
     val reasons: List<String>,
 )
@@ -46,6 +51,9 @@ data class WorldResponse(val totalStats: Int, val regions: List<RegionResponse>)
 data class DungeonResultResponse(
     val dungeon: String,
     val boss: String,
+    val victory: Boolean,
+    val winChance: Int,
+    val chest: ChestResponse?,
     val rewardStones: Int,
     val rewardGold: Long,
     val item: ItemResponse?,
@@ -85,6 +93,7 @@ class WorldService(
                             .filter { it.value > 0 }
                             .joinToString(" · ") { "${Grade.entries[it.index].displayName} ${it.value}%" },
                         clears = dungeonClearRepository.countByHeroIdAndRegion(hero.id!!, region.tier),
+                        winChance = BattleRules.percent(BattleRules.dungeonWinChance(total, region.dungeonMinTotalStats)),
                         available = reasons.isEmpty(),
                         reasons = reasons,
                     ),
@@ -98,20 +107,37 @@ class WorldService(
     fun enterDungeon(accountId: Long, tier: Int): DungeonResultResponse {
         val region = Region.byTier(tier) ?: throw NotFoundException("없는 지역입니다")
         val hero = heroService.requireForUpdate(accountId)
-        val reasons = missing(hero, heroService.stats(hero).values.sum(), region)
+        val total = heroService.stats(hero).values.sum()
+        val reasons = missing(hero, total, region)
         if (reasons.isNotEmpty()) throw BadRequestException(reasons.joinToString(", "))
 
         hero.stamina -= region.dungeonStaminaCost
-        hero.enhanceStones += region.dungeonStones
-        hero.gold += region.dungeonGold
+        val chance = BattleRules.dungeonWinChance(total, region.dungeonMinTotalStats)
+        if (random.nextDouble() >= chance) {
+            // 패배: 행동력만 소모
+            return DungeonResultResponse(
+                dungeon = region.dungeonName, boss = region.dungeonBoss, victory = false,
+                winChance = BattleRules.percent(chance), chest = null, rewardStones = 0, rewardGold = 0, item = null,
+                hero = heroService.response(hero),
+            )
+        }
+
+        val chest = ChestTier.roll(random)
+        val stones = (region.dungeonStones * chest.multiplier).toInt() + chest.bonusStones
+        val gold = (region.dungeonGold * chest.multiplier).toLong()
+        hero.enhanceStones += stones
+        hero.gold += gold
         dungeonClearRepository.save(DungeonClear(hero, region.tier))
-        val item = if (random.nextInt(100) < Region.DROP_RATE) itemFactory.dungeonDrop(hero, region) else null
+        val item = if (random.nextInt(100) < chest.itemChance) itemFactory.dungeonDrop(hero, region) else null
 
         return DungeonResultResponse(
             dungeon = region.dungeonName,
             boss = region.dungeonBoss,
-            rewardStones = region.dungeonStones,
-            rewardGold = region.dungeonGold,
+            victory = true,
+            winChance = BattleRules.percent(chance),
+            chest = ChestResponse.of(chest),
+            rewardStones = stones,
+            rewardGold = gold,
             item = item?.let(ItemResponse::from),
             hero = heroService.response(hero),
         )

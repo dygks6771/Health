@@ -98,10 +98,22 @@ enum class ItemSlot(val displayName: String, val stat: Stat) {
 
 /** 장비 수치와 대장간 강화 규칙 */
 object ItemRules {
-    const val MAX_ENHANCE = 15
+    const val MAX_ENHANCE = 25
 
-    /** +0→+1 부터 +14→+15 까지 성공 확률(%). 실패해도 단계는 유지되고 재료만 소모 */
-    private val SUCCESS_RATES = listOf(100, 100, 100, 90, 85, 80, 70, 60, 50, 40, 35, 30, 25, 20, 15)
+    /** +0→+1 부터 +24→+25 까지 성공 확률(%). 높을수록 실패 확률 증가 */
+    private val SUCCESS_RATES = listOf(
+        100, 100, 100, 95, 90, // +0 ~ +4
+        85, 80, 75, 70, 65, // +5 ~ +9
+        60, 55, 50, 45, 40, // +10 ~ +14
+        35, 30, 25, 20, 16, // +15 ~ +19
+        12, 9, 7, 5, 3, // +20 ~ +24
+    )
+
+    /**
+     * 강화 실패 시 떨어지는 단계: +0~4 유지, +5~9 -1, +10~14 -2, +15~19 -3, +20~24 -4.
+     * 높은 단계일수록 실패가 더 아프다.
+     */
+    fun failDrop(enhance: Int): Int = (enhance / 5).coerceIn(0, 4)
 
     /** 티어(던전 1~10) × 등급으로 주 능력치 결정: 티어1 일반 6 ~ 티어10 전설 73 */
     fun mainValue(tier: Int, grade: Grade): Int = ((3 + 3 * tier) * grade.multiplier).roundToInt()
@@ -158,4 +170,60 @@ object AuctionRules {
     const val MAX_LISTINGS = 10
 
     fun sellerReceives(price: Long): Long = price - price * FEE_PERCENT / 100
+}
+
+/** 토벌·던전 승률. 결과는 서버에서 확률로 정해지고 질 수도 있다 */
+object BattleRules {
+    /** 권장 전투력의 이 비율 미만이면 도전 불가 (너무 약함) */
+    const val HUNT_MIN_RATIO = 0.5
+
+    /**
+     * 토벌 승률 (내 전투력 / 권장 전투력):
+     * 0.5배 10% → 1배 70% → 1.5배 이상 100%
+     */
+    fun huntWinChance(power: Int, required: Int): Double {
+        val r = power.toDouble() / required.coerceAtLeast(1)
+        return when {
+            r >= 1.5 -> 1.0
+            r >= 1.0 -> 0.7 + 0.6 * (r - 1.0)
+            else -> (0.1 + 1.2 * (r - 0.5)).coerceAtLeast(0.0)
+        }
+    }
+
+    /**
+     * 던전 승률 (내 능력치 합 / 최소 능력치 합). 최소치를 넘어야 입장 가능:
+     * 1배 60% → 1.5배 이상 100%
+     */
+    fun dungeonWinChance(totalStats: Int, minTotalStats: Int): Double {
+        val r = totalStats.toDouble() / minTotalStats.coerceAtLeast(1)
+        return if (r >= 1.5) 1.0 else (0.6 + 0.8 * (r - 1.0)).coerceIn(0.0, 1.0)
+    }
+
+    fun percent(chance: Double): Int = (chance * 100).toInt()
+}
+
+/** 승리 보상 상자. 등급에 따라 보상 배율과 추가 보상이 달라짐 */
+enum class ChestTier(val displayName: String, val multiplier: Double, val weight: Int, val bonusStones: Int, val itemChance: Int) {
+    WOOD("나무 상자", 1.0, 70, 0, 50),
+    SILVER("은 상자", 1.5, 25, 1, 75),
+    GOLD("황금 상자", 2.5, 5, 3, 100),
+    ;
+
+    companion object {
+        fun roll(random: kotlin.random.Random): ChestTier {
+            var roll = random.nextInt(entries.sumOf { it.weight })
+            for (tier in entries) {
+                if (roll < tier.weight) return tier
+                roll -= tier.weight
+            }
+            return WOOD
+        }
+    }
+}
+
+/** 하루 한 번 받는 출석 보상 */
+object DailyRewardRules {
+    fun gold(tier: Int, chest: ChestTier): Long = (100L * tier * chest.multiplier).toLong()
+
+    fun stones(chest: ChestTier): Int = (2 * chest.multiplier).toInt()
 }

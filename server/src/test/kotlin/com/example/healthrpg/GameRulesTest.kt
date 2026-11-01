@@ -44,8 +44,13 @@ class GameRulesTest {
         assertEquals(10, ItemRules.subValue(30, Grade.RARE))
         assertEquals(15, ItemRules.enhanced(10, 5))
         assertEquals(100, ItemRules.successRate(0))
-        assertNull(ItemRules.successRate(15))
-        assertNull(ItemRules.enhanceCost(1, 15))
+        assertEquals(3, ItemRules.successRate(24))
+        assertNull(ItemRules.successRate(25))
+        assertNull(ItemRules.enhanceCost(1, 25))
+        // 실패 시 하락 단계가 점점 커짐
+        assertEquals(listOf(0, 0, 1, 2, 3, 4), listOf(0, 4, 5, 10, 15, 24).map(ItemRules::failDrop))
+        // 성공률은 단계가 오를수록 줄어듦
+        assertTrue((0 until 24).all { ItemRules.successRate(it)!! >= ItemRules.successRate(it + 1)!! })
     }
 
     @Test
@@ -55,6 +60,15 @@ class GameRulesTest {
         assertEquals(2, targets.count { it.first == HuntDifficulty.NORMAL && it.second == 10 })
         assertEquals(1, targets.count { it.first == HuntDifficulty.HARD && it.second > 10 })
         assertEquals(listOf(1, 1, 1, 1, 2), GuildRules.targetLevels(1).map { it.second })
+    }
+
+    @Test
+    fun `win chances grow with power and can lose`() {
+        assertEquals(0.7, com.example.healthrpg.game.BattleRules.huntWinChance(100, 100), 1e-9)
+        assertEquals(1.0, com.example.healthrpg.game.BattleRules.huntWinChance(150, 100), 1e-9)
+        assertEquals(0.1, com.example.healthrpg.game.BattleRules.huntWinChance(50, 100), 1e-9)
+        assertEquals(0.6, com.example.healthrpg.game.BattleRules.dungeonWinChance(20, 20), 1e-9)
+        assertEquals(1.0, com.example.healthrpg.game.BattleRules.dungeonWinChance(30, 20), 1e-9)
     }
 
     @Test

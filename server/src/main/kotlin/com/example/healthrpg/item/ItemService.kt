@@ -19,6 +19,8 @@ data class EnhanceResultResponse(
     val rate: Int,
     val enhanceBefore: Int,
     val enhanceAfter: Int,
+    /** 실패로 떨어진 단계 수 */
+    val dropped: Int,
     val item: ItemResponse,
     val hero: HeroResponse,
 )
@@ -82,7 +84,7 @@ class ItemService(
         return BulkSellResponse(targets.size, gold, inventory(accountId))
     }
 
-    /** 대장간 강화: 강화석과 골드를 쓰고 확률로 +1. 실패해도 단계는 유지 */
+    /** 대장간 강화: 강화석과 골드를 쓰고 확률로 +1. 실패하면 단계가 떨어질 수 있음 (+5 이상) */
     @Transactional
     fun enhance(accountId: Long, itemId: Long): EnhanceResultResponse {
         val hero = heroService.requireForUpdate(accountId)
@@ -100,13 +102,15 @@ class ItemService(
         hero.gold -= cost.gold
         val before = item.enhance
         val success = random.nextInt(100) < rate
-        if (success) item.enhance += 1
+        val dropped = if (success) 0 else minOf(ItemRules.failDrop(before), before)
+        item.enhance = if (success) before + 1 else before - dropped
 
         return EnhanceResultResponse(
             success = success,
             rate = rate,
             enhanceBefore = before,
             enhanceAfter = item.enhance,
+            dropped = dropped,
             item = ItemResponse.from(item),
             hero = heroService.response(hero),
         )

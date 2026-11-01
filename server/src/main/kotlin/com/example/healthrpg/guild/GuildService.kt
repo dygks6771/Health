@@ -3,6 +3,9 @@ package com.example.healthrpg.guild
 import com.example.healthrpg.auth.LoginAccount
 import com.example.healthrpg.common.BadRequestException
 import com.example.healthrpg.common.NotFoundException
+import com.example.healthrpg.game.BattleRules
+import com.example.healthrpg.game.ChestResponse
+import com.example.healthrpg.game.ChestTier
 import com.example.healthrpg.game.GameRules
 import com.example.healthrpg.game.GuildRules
 import com.example.healthrpg.game.HuntDifficulty
@@ -29,6 +32,8 @@ data class HuntResponse(
     val requiredPower: Int,
     val rewardGold: Int,
     val staminaCost: Int,
+    /** 승률 % (질 수도 있음) */
+    val winChance: Int,
     val cleared: Boolean,
     val available: Boolean,
     val reasons: List<String>,
@@ -36,7 +41,16 @@ data class HuntResponse(
 
 data class GuildBoardResponse(val date: LocalDate, val power: Int, val hunts: List<HuntResponse>)
 
-data class HuntResultResponse(val monster: String, val rewardGold: Int, val hero: HeroResponse)
+data class HuntResultResponse(
+    val monster: String,
+    val victory: Boolean,
+    val winChance: Int,
+    /** 승리 시 상자 보상 (패배면 0 / null) */
+    val rewardGold: Int,
+    val rewardStones: Int,
+    val chest: ChestResponse?,
+    val hero: HeroResponse,
+)
 
 /**
  * 모험자 길드: 매일 바뀌는 토벌 의뢰 5개.
@@ -65,9 +79,22 @@ class GuildService(
         if (reasons.isNotEmpty()) throw BadRequestException(reasons.joinToString(", "))
 
         hero.stamina -= GuildRules.HUNT_STAMINA_COST
-        hero.gold += hunt.rewardGold
+        val chance = BattleRules.huntWinChance(heroService.power(hero), hunt.requiredPower)
+        val victory = random.nextDouble() < chance
+        if (!victory) {
+            // 패배: 행동력만 쓰고 보상 없음. 의뢰는 남아 있어 다시 도전 가능
+            return HuntResultResponse(hunt.monster, false, BattleRules.percent(chance), 0, 0, null, heroService.response(hero))
+        }
+
+        val chest = ChestTier.roll(random)
+        val gold = (hunt.rewardGold * chest.multiplier * (0.9 + random.nextDouble() * 0.2)).toInt()
+        hero.gold += gold
+        hero.enhanceStones += chest.bonusStones
         hunt.cleared = true
-        return HuntResultResponse(hunt.monster, hunt.rewardGold, heroService.response(hero))
+        return HuntResultResponse(
+            hunt.monster, true, BattleRules.percent(chance), gold, chest.bonusStones, ChestResponse.of(chest),
+            heroService.response(hero),
+        )
     }
 
     private fun huntsFor(hero: Hero, date: LocalDate): List<DailyHunt> {
@@ -94,7 +121,8 @@ class GuildService(
 
     private fun missing(hero: Hero, power: Int, hunt: DailyHunt): List<String> = buildList {
         if (hunt.cleared) add("오늘 이미 완료한 의뢰")
-        if (power < hunt.requiredPower) add("전투력 ${hunt.requiredPower} 필요")
+        val minimum = (hunt.requiredPower * BattleRules.HUNT_MIN_RATIO).toInt()
+        if (power < minimum) add("전투력 최소 $minimum 필요")
         if (hero.stamina < GuildRules.HUNT_STAMINA_COST) add("행동력 ${GuildRules.HUNT_STAMINA_COST} 필요")
     }
 
@@ -110,6 +138,7 @@ class GuildService(
             requiredPower = hunt.requiredPower,
             rewardGold = hunt.rewardGold,
             staminaCost = GuildRules.HUNT_STAMINA_COST,
+            winChance = BattleRules.percent(BattleRules.huntWinChance(power, hunt.requiredPower)),
             cleared = hunt.cleared,
             available = reasons.isEmpty(),
             reasons = reasons,

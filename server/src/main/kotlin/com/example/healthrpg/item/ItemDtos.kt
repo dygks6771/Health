@@ -29,6 +29,8 @@ data class ItemResponse(
     val nextEnhanceRate: Int?,
     val nextEnhanceStones: Int?,
     val nextEnhanceGold: Long?,
+    /** 다음 강화가 실패하면 떨어지는 단계 수 */
+    val failDrop: Int,
 ) {
     companion object {
         fun from(item: Item): ItemResponse {
@@ -55,6 +57,7 @@ data class ItemResponse(
                 nextEnhanceRate = ItemRules.successRate(item.enhance),
                 nextEnhanceStones = cost?.stones,
                 nextEnhanceGold = cost?.gold,
+                failDrop = ItemRules.failDrop(item.enhance),
             )
         }
     }
