@@ -1,6 +1,6 @@
 package com.example.healthrpg.run
 
-import com.example.healthrpg.user.User
+import com.example.healthrpg.hero.Hero
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
@@ -10,6 +10,8 @@ import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
 import java.time.Instant
 import java.time.LocalDate
 
@@ -18,8 +20,8 @@ import java.time.LocalDate
 @Table(name = "run_sessions")
 class RunSession(
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
-    val user: User,
+    @JoinColumn(name = "hero_id", nullable = false)
+    val hero: Hero,
 
     @Column(name = "external_id", nullable = false, length = 200)
     val externalId: String,
@@ -58,4 +60,20 @@ class RunSession(
 
     @Column(name = "synced_at", nullable = false)
     val syncedAt: Instant = Instant.now()
+}
+
+interface RunSessionRepository : JpaRepository<RunSession, Long> {
+    fun existsByHeroIdAndExternalId(heroId: Long, externalId: String): Boolean
+
+    @Query(
+        "select coalesce(sum(r.countedMeters), 0) from RunSession r " +
+            "where r.hero.id = :heroId and r.runDate between :from and :to",
+    )
+    fun sumCountedMeters(heroId: Long, from: LocalDate, to: LocalDate): Long
+
+    @Query(
+        "select coalesce(sum(r.distanceMeters), 0) from RunSession r " +
+            "where r.hero.id = :heroId and r.runDate between :from and :to",
+    )
+    fun sumDistanceMeters(heroId: Long, from: LocalDate, to: LocalDate): Long
 }

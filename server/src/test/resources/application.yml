@@ -4,3 +4,8 @@ spring:
     url: jdbc:h2:mem:healthrpg;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     username: sa
     password:
+
+game:
+  zone: Asia/Seoul
+  dev-tools:
+    enabled: true

@@ -24,6 +24,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
+    // 비밀번호 해시(BCrypt)만 사용. 인증 필터는 직접 구현 (auth 패키지)
+    implementation("org.springframework.security:spring-security-crypto")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")

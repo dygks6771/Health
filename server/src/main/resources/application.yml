@@ -20,3 +20,10 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+game:
+  # 일일 토벌 초기화, 하루 러닝 상한 기준 시간대
+  zone: Asia/Seoul
+  dev-tools:
+    # 테스트용 친구 봇 생성 API (/api/dev/**). 실제 서비스 배포 시 반드시 false
+    enabled: ${GAME_DEV_TOOLS:true}
