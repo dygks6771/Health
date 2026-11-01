@@ -109,11 +109,8 @@ object ItemRules {
         12, 9, 7, 5, 3, // +20 ~ +24
     )
 
-    /**
-     * 강화 실패 시 떨어지는 단계: +0~4 유지, +5~9 -1, +10~14 -2, +15~19 -3, +20~24 -4.
-     * 높은 단계일수록 실패가 더 아프다.
-     */
-    fun failDrop(enhance: Int): Int = (enhance / 5).coerceIn(0, 4)
+    /** 강화 실패 시 떨어지는 단계: +0~4 는 유지, +5 이상은 1단계만 하락 */
+    fun failDrop(enhance: Int): Int = if (enhance >= 5) 1 else 0
 
     /** 티어(던전 1~10) × 등급으로 주 능력치 결정: 티어1 일반 6 ~ 티어10 전설 73 */
     fun mainValue(tier: Int, grade: Grade): Int = ((3 + 3 * tier) * grade.multiplier).roundToInt()

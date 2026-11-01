@@ -65,7 +65,7 @@ fun SmithScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ScreenHeader("대장간", onBack)
-        NpcBanner(NpcSprites.blacksmith, "+25 까지 두드려 주지. 다만 +5 부터는 실패하면 쇠가 상해 단계가 떨어지네. 높을수록 더 크게!")
+        NpcBanner(NpcSprites.blacksmith, "+25 까지 두드려 주지. 다만 +5 부터는 실패하면 쇠가 상해 한 단계 떨어지네. 높을수록 성공도 어렵고!")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ResourceChip("💎", "강화석 ${hero.enhanceStones}")
             ResourceChip("💰", "%,d".format(hero.gold))

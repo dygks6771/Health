@@ -47,8 +47,8 @@ class GameRulesTest {
         assertEquals(3, ItemRules.successRate(24))
         assertNull(ItemRules.successRate(25))
         assertNull(ItemRules.enhanceCost(1, 25))
-        // 실패 시 하락 단계가 점점 커짐
-        assertEquals(listOf(0, 0, 1, 2, 3, 4), listOf(0, 4, 5, 10, 15, 24).map(ItemRules::failDrop))
+        // 실패 시 +5 이상은 1단계만 하락
+        assertEquals(listOf(0, 0, 1, 1, 1, 1), listOf(0, 4, 5, 10, 15, 24).map(ItemRules::failDrop))
         // 성공률은 단계가 오를수록 줄어듦
         assertTrue((0 until 24).all { ItemRules.successRate(it)!! >= ItemRules.successRate(it + 1)!! })
     }
