@@ -1,6 +1,7 @@
 package com.example.health.net
 
 import android.content.Context
+import com.example.health.BuildConfig
 
 /** 서버 주소, 로그인 토큰, 마지막 영웅 상태를 폰에 저장 */
 class Session(context: Context) {
@@ -30,6 +31,25 @@ class Session(context: Context) {
         get() = prefs.getString(KEY_HERO, null)
         set(value) = prefs.edit().putString(KEY_HERO, value).apply()
 
+    /** 원정 목표 달성·레벨 업 알림 (설정에서 끌 수 있음) */
+    var notificationsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_NOTIFICATIONS, true)
+        set(value) = prefs.edit().putBoolean(KEY_NOTIFICATIONS, value).apply()
+
+    /** 알림 권한을 이미 물어봤는지 (한 번만 묻기) */
+    var askedNotificationPermission: Boolean
+        get() = prefs.getBoolean(KEY_ASKED_NOTIFICATION, false)
+        set(value) = prefs.edit().putBoolean(KEY_ASKED_NOTIFICATION, value).apply()
+
+    /** 같은 알림을 반복하지 않도록 마지막으로 보낸 주/날 */
+    var weeklyAchievedNotifiedFor: String?
+        get() = prefs.getString(KEY_WEEKLY_NOTIFIED, null)
+        set(value) = prefs.edit().putString(KEY_WEEKLY_NOTIFIED, value).apply()
+
+    var weeklyReminderNotifiedOn: String?
+        get() = prefs.getString(KEY_REMINDER_NOTIFIED, null)
+        set(value) = prefs.edit().putString(KEY_REMINDER_NOTIFIED, value).apply()
+
     fun logout() {
         prefs.edit().remove(KEY_TOKEN).remove(KEY_HERO).remove(KEY_LAST_SYNC_AT).apply()
     }
@@ -42,7 +62,7 @@ class Session(context: Context) {
          * - 밖에서(원격): Tailscale 주소 http://100.x.x.x:8080 또는 ngrok 등의 https 주소
          * 서버를 켜면 콘솔에 폰에서 쓸 수 있는 주소가 출력된다.
          */
-        const val DEFAULT_SERVER_URL = "http://127.0.0.1:8080"
+        val DEFAULT_SERVER_URL: String = BuildConfig.DEFAULT_SERVER_URL
 
         /**
          * 사용자가 입력한 주소 정리: 앞뒤 공백·끝의 / 와 /api 제거, http(s):// 가 없으면 붙인다.
@@ -65,5 +85,9 @@ class Session(context: Context) {
         private const val KEY_LOGIN_ID = "login_id"
         private const val KEY_LAST_SYNC_AT = "last_sync_at"
         private const val KEY_HERO = "hero"
+        private const val KEY_NOTIFICATIONS = "notifications"
+        private const val KEY_ASKED_NOTIFICATION = "asked_notification"
+        private const val KEY_WEEKLY_NOTIFIED = "weekly_notified"
+        private const val KEY_REMINDER_NOTIFIED = "reminder_notified"
     }
 }

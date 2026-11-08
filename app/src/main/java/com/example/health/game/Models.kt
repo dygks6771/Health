@@ -502,6 +502,8 @@ data class Listing(
 
 /** 주간 원정: 이번 주 개인 맞춤 목표 거리, 연속 달성, 하루별 거리, 개인 기록, 원정 지도 진행 */
 data class WeeklyInfo(
+    /** 이번 주 월요일 (yyyy-MM-dd) */
+    val weekStart: String,
     val goalKm: Double,
     val progressKm: Double,
     val achieved: Boolean,
@@ -533,6 +535,7 @@ data class WeeklyInfo(
             val records = j.getJSONObject("records")
             val exp = j.getJSONObject("expedition")
             return WeeklyInfo(
+                weekStart = j.getString("weekStart"),
                 goalKm = j.getDouble("goalKm"),
                 progressKm = j.getDouble("progressKm"),
                 achieved = j.getBoolean("achieved"),

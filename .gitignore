@@ -13,3 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+# 출시 서명 키 (절대 저장소에 올리지 않음)
+keystore.properties
+*.jks
+*.keystore

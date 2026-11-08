@@ -108,10 +108,10 @@ fun FriendsScreen(api: ApiClient, hero: HeroInfo, onBack: () -> Unit) {
             }
         }
 
-        Panel(title = "🛠 개발용") {
-            Text("레이드 테스트용: 내 레벨의 용병 친구를 4명까지 만들어 줍니다 (서버 개발 모드에서만)", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+        Panel(title = "⚔ 용병 모집") {
+            Text("함께할 친구가 부족하면 내 레벨의 용병을 4명까지 친구로 데려옵니다. 용병은 이번 주 6km 를 뛴 것으로 레이드에 참여해요.", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
             GhostButton(
-                "테스트 친구 만들기",
+                "용병 친구 모으기",
                 onClick = { actions.run { info = FriendsInfo.from(api.devFriendBots()); "용병 친구를 모았습니다" } },
                 enabled = !actions.busy,
             )

@@ -1,7 +1,10 @@
 package com.example.health.lobby
 
+import android.Manifest
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,6 +58,7 @@ import com.example.health.net.ApiClient
 import com.example.health.net.ApiException
 import com.example.health.net.ServerUnreachableException
 import com.example.health.net.Session
+import com.example.health.notify.Notifier
 import com.example.health.sync.RunSyncer
 import com.example.health.sync.SyncWorker
 import com.example.health.ui.battle.ChestInfo
@@ -227,6 +231,17 @@ fun LobbyScreen(
         PermissionController.createRequestPermissionResultContract(),
     ) { scope.launch { syncNow() } }
 
+    // 알림 권한 (Android 13+): 처음 한 번만 묻는다. 거절하면 설정 → 알림에서 다시 켤 수 있음
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        session.notificationsEnabled = granted
+    }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= 33 && !session.askedNotificationPermission && !Notifier.canNotify(context)) {
+            session.askedNotificationPermission = true
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     LaunchedEffect(resumeKey) {
         runCatching { dailyClaimed = api.dailyStatus().getBoolean("claimedToday") }
         refreshWeekly()
@@ -259,6 +274,9 @@ fun LobbyScreen(
             }
 
             HeroCard(hero)
+
+            // 처음 시작한 모험가에게 게임 방법 안내 (첫 러닝 전까지)
+            if (weekly?.totalKm == 0.0) StarterGuide()
 
             weekly?.let { WeeklyCard(it, claiming = claimingWeekly, onClaim = { claimWeekly() }) }
 
@@ -302,6 +320,19 @@ fun LobbyScreen(
                 onClose = { menuOpen = false },
             )
         }
+    }
+}
+
+/** 첫 러닝 전 안내: 무엇을 하면 무엇이 오르는지 */
+@Composable
+private fun StarterGuide() {
+    Panel(title = "📖 모험가 안내서", highlight = true) {
+        listOf(
+            "🏃 삼성헬스 등으로 러닝을 기록하면 경험치·골드를 받고, 누적 거리만큼 새 지역이 열려요.",
+            "👣 걸음 수는 행동력이 됩니다. 행동력으로 길드 토벌·던전·레이드에 도전하세요.",
+            "🎯 매주 나에게 맞춘 원정 목표가 생겨요. 달성하면 보물 상자, 3주 연속이면 황금 상자!",
+            "🐉 레이드는 친구 4명과 함께. 모두가 이번 주에 많이 뛸수록 강해져요.",
+        ).forEach { Text(it, color = Parchment, style = MaterialTheme.typography.bodySmall) }
     }
 }
 

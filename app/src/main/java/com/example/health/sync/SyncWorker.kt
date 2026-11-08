@@ -11,9 +11,12 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.example.health.game.WeeklyInfo
 import com.example.health.health.RunReader
+import com.example.health.net.ApiClient
 import com.example.health.net.ApiException
 import com.example.health.net.Session
+import com.example.health.notify.Notifier
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -36,7 +39,13 @@ class SyncWorker(
 
         return try {
             if (!reader.hasAllPermissions()) return Result.success()
-            RunSyncer(reader, session).sync()
+            val api = ApiClient(session)
+            val result = RunSyncer(reader, session, api).sync()
+            // 알림은 덤: 실패해도 동기화는 성공으로 처리
+            runCatching {
+                val weekly = WeeklyInfo.from(api.weekly())
+                Notifier.afterSync(applicationContext, session, result.reward.takeIf { it.newRuns > 0 }, weekly)
+            }
             Result.success()
         } catch (e: SecurityException) {
             // 백그라운드 읽기 권한이 없거나 지원하지 않는 기기: 앱을 열 때 동기화됨

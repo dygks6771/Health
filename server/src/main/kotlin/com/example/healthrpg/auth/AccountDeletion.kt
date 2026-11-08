@@ -5,6 +5,7 @@ import com.example.healthrpg.common.UnauthorizedException
 import com.example.healthrpg.friend.FriendService
 import com.example.healthrpg.hero.HeroRepository
 import jakarta.persistence.EntityManager
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import org.springframework.http.HttpStatus
@@ -32,6 +33,15 @@ class AccountDeletionService(
 ) {
     private val passwordEncoder = BCryptPasswordEncoder()
 
+    /** 웹 페이지(앱 없이)에서 아이디·비밀번호로 탈퇴 */
+    @Transactional
+    fun deleteByLogin(loginId: String, password: String) {
+        val account = accountRepository.findByLoginId(loginId.trim().lowercase())
+            ?: throw UnauthorizedException("아이디 또는 비밀번호가 올바르지 않습니다")
+        if (!passwordEncoder.matches(password, account.passwordHash)) throw UnauthorizedException("아이디 또는 비밀번호가 올바르지 않습니다")
+        delete(account.id!!, password)
+    }
+
     @Transactional
     fun delete(accountId: Long, password: String) {
         val account = accountRepository.findById(accountId).orElseThrow { UnauthorizedException() }
@@ -49,10 +59,30 @@ class AccountDeletionService(
 }
 
 @RestController
-class AccountDeletionController(private val accountDeletionService: AccountDeletionService) {
+class AccountDeletionController(
+    private val accountDeletionService: AccountDeletionService,
+    private val limits: AuthLimits,
+) {
+    /** 앱 설정 → 회원 탈퇴 */
     @PostMapping("/api/me/account/delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun delete(@LoginAccount accountId: Long, @Valid @RequestBody request: DeleteAccountRequest) {
         accountDeletionService.delete(accountId, request.password)
+    }
+
+    /** 웹 탈퇴 페이지(/delete-account.html)용. 앱을 지운 사용자도 탈퇴할 수 있어야 함 (스토어 정책). 로그인과 같은 시도 제한 */
+    @PostMapping("/api/auth/delete-account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteByLogin(@Valid @RequestBody request: AuthRequest, http: HttpServletRequest) {
+        val loginId = request.loginId.trim().lowercase()
+        limits.loginPerId.check(loginId, limits::waitMessage)
+        limits.loginPerIp.check(http.remoteAddr, limits::waitMessage)
+        try {
+            accountDeletionService.deleteByLogin(loginId, request.password)
+        } catch (e: UnauthorizedException) {
+            limits.loginPerId.record(loginId)
+            limits.loginPerIp.record(http.remoteAddr)
+            throw e
+        }
     }
 }

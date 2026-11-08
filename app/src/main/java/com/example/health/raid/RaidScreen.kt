@@ -202,11 +202,6 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-
-        Panel(title = "🛠 개발용") {
-            Text("테스트를 위해 이번 주 레이드 제한을 초기화합니다 (서버 개발 모드에서만)", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
-            GhostButton("주간 제한 초기화", onClick = { actions.run { api.devRaidReset(); load(); "초기화했습니다" } }, enabled = !actions.busy)
-        }
     }
     battle?.let { BattleOverlay(it) { battle = null } }
     }

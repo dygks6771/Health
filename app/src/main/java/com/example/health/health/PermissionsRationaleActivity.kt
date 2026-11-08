@@ -7,18 +7,22 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.health.settings.PrivacyPolicyContent
+import com.example.health.ui.fantasy.FantasyBackground
+import com.example.health.ui.fantasy.GoldButton
+import com.example.health.ui.fantasy.ScreenHeader
 import com.example.health.ui.theme.HealthTheme
 
 /**
- * Health Connect 권한 화면에서 "개인정보처리방침"을 누르면 열리는 화면.
- * 정식 출시 전에는 실제 개인정보처리방침 페이지로 교체해야 함.
+ * Health Connect 권한 화면에서 "개인정보처리방침"을 누르면 열리는 화면 (Health Connect 필수 요구사항).
+ * 앱이 운동 데이터를 왜, 어떻게 쓰는지 보여준다.
  */
 class PermissionsRationaleActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,18 +30,18 @@ class PermissionsRationaleActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             HealthTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                FantasyBackground {
                     Column(
-                        modifier = Modifier.padding(innerPadding).padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .systemBarsPadding()
+                            .verticalScroll(rememberScrollState())
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        Text("운동 데이터 사용 안내", style = MaterialTheme.typography.headlineSmall)
-                        Text(
-                            "이 앱은 Health Connect 에 저장된 러닝 기록과 거리(삼성헬스 등)를 읽어 " +
-                                "영웅의 경험치·골드·행동력을 계산하는 데 사용합니다. " +
-                                "그 외의 건강 데이터는 읽지 않으며, 권한은 언제든 Health Connect 설정에서 해제할 수 있습니다.",
-                        )
-                        Button(onClick = { finish() }) { Text("확인") }
+                        ScreenHeader("개인정보처리방침", onBack = null)
+                        PrivacyPolicyContent()
+                        GoldButton("확인", onClick = { finish() }, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>계정 삭제 · 러너스 크로니클</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+<h1>러너스 크로니클 계정 삭제</h1>
+<p class="dim">앱이 없어도 여기서 탈퇴할 수 있습니다. 앱에서는 <b>설정 → 회원 탈퇴</b>로도 할 수 있어요.</p>
+
+<div class="card">
+  <p>삭제되는 정보: 계정(아이디·비밀번호), 영웅과 장비·재화, 러닝·걸음 기록, 친구 관계.<br>
+  <b>즉시 모두 삭제되며 되돌릴 수 없습니다.</b> 별도로 보관하는 정보는 없습니다.</p>
+  <form id="form">
+    <label for="loginId">아이디</label>
+    <input id="loginId" autocomplete="username" required>
+    <label for="password">비밀번호</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <button id="submit" type="submit">계정 영구 삭제</button>
+  </form>
+  <p id="msg" class="msg"></p>
+</div>
+<p class="dim" style="margin-top:20px"><a href="/privacy.html">개인정보처리방침</a></p>
+</main>
+<script>
+const form = document.getElementById('form');
+const msg = document.getElementById('msg');
+const button = document.getElementById('submit');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!confirm('정말 삭제할까요? 되돌릴 수 없습니다.')) return;
+  button.disabled = true;
+  msg.className = 'msg';
+  msg.textContent = '처리 중...';
+  try {
+    const res = await fetch('/api/auth/delete-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginId: document.getElementById('loginId').value, password: document.getElementById('password').value }),
+    });
+    if (res.status === 204) {
+      msg.className = 'msg ok';
+      msg.textContent = '계정과 모든 게임 데이터가 삭제되었습니다.';
+      form.reset();
+    } else {
+      const body = await res.json().catch(() => ({}));
+      msg.className = 'msg err';
+      msg.textContent = body.message || ('삭제하지 못했습니다 (HTTP ' + res.status + ')');
+    }
+  } catch (err) {
+    msg.className = 'msg err';
+    msg.textContent = '서버에 연결하지 못했습니다.';
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

@@ -149,11 +149,12 @@ class ApiClient(private val session: Session) {
     suspend fun acceptFriend(friendshipId: Long): JSONObject = obj("POST", "/api/me/friends/$friendshipId/accept")
     suspend fun removeFriend(friendshipId: Long): JSONObject = obj("DELETE", "/api/me/friends/$friendshipId")
 
-    /** 개발용: 친구 봇 4명 (서버 game.dev-tools.enabled=true 일 때만) */
+    /** 용병 친구 4명 모집 (서버 game.dev-tools.enabled=true 일 때만) */
     suspend fun devFriendBots(): JSONObject = obj("POST", "/api/dev/friend-bots")
 
-    /** 개발용: 레이드 주 1회 제한 초기화 */
-    suspend fun devRaidReset(): JSONObject = obj("POST", "/api/dev/raid-reset")
+    /** 회원 탈퇴: 비밀번호 확인 후 계정과 모든 게임 데이터 삭제 */
+    suspend fun deleteAccount(password: String): JSONObject =
+        obj("POST", "/api/me/account/delete", JSONObject().put("password", password))
 
     // ── 주간 원정 ──
     suspend fun weekly(): JSONObject = obj("GET", "/api/me/weekly")

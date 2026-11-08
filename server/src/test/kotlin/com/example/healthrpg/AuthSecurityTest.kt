@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import tools.jackson.databind.ObjectMapper
 import java.time.Duration
@@ -83,5 +84,22 @@ class AuthSecurityTest(
         assertEquals(15 * 60L, limiter.blockedSeconds("a"))
         now = now.plus(Duration.ofMinutes(15))
         assertNull(limiter.blockedSeconds("a"))
+    }
+
+    @Test
+    fun `web page can delete an account with id and password`() {
+        val loginId = ApiTestSupport.nextId()
+        api.signup(loginId, "password123")
+        val del = { password: String ->
+            mockMvc.post("/api/auth/delete-account") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"loginId":"$loginId","password":"$password"}"""
+            }
+        }
+        del("wrong-pass").andExpect { status { isUnauthorized() } }
+        del("password123").andExpect { status { isNoContent() } }
+        login(loginId, "password123").andExpect { status { isUnauthorized() } }
+        mockMvc.get("/delete-account.html").andExpect { status { isOk() } }
+        mockMvc.get("/privacy.html").andExpect { status { isOk() } }
     }
 }

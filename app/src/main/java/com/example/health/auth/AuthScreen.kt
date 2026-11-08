@@ -1,5 +1,7 @@
 package com.example.health.auth
 
+import com.example.health.BuildConfig
+import com.example.health.settings.PrivacyPolicyContent
 import com.example.health.settings.ServerAddressHelp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,11 +45,12 @@ fun AuthScreen(session: Session, api: ApiClient, onLoggedIn: () -> Unit) {
     var password by remember { mutableStateOf("") }
     var passwordCheck by remember { mutableStateOf("") }
     var showServer by remember { mutableStateOf(false) }
+    var showPolicy by remember { mutableStateOf(false) }
     var serverUrl by remember { mutableStateOf(session.serverUrl) }
     val actions = rememberActions()
 
     fun submit() = actions.run {
-        session.serverUrl = serverUrl
+        if (BuildConfig.DEBUG) session.serverUrl = serverUrl
         if (signup && password != passwordCheck) error("비밀번호 확인이 일치하지 않습니다")
         val result = if (signup) api.signup(loginId, password) else api.login(loginId, password)
         session.token = result.getString("token")
@@ -109,10 +112,22 @@ fun AuthScreen(session: Session, api: ApiClient, onLoggedIn: () -> Unit) {
             }
         }
 
-        Row {
-            TextButton(onClick = { showServer = !showServer }) { Text("서버 설정", color = ParchmentDim) }
+        if (signup) {
+            Text(
+                "가입하면 개인정보처리방침(운동 기록은 게임 보상 계산에만 사용)에 동의하는 것으로 봅니다.",
+                color = ParchmentDim,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
-        if (showServer) {
+        Row {
+            TextButton(onClick = { showPolicy = !showPolicy }) { Text("개인정보처리방침", color = ParchmentDim) }
+            // 서버 주소는 개발 빌드에서만 (출시 빌드는 정해진 서버)
+            if (BuildConfig.DEBUG) {
+                TextButton(onClick = { showServer = !showServer }) { Text("서버 설정", color = ParchmentDim) }
+            }
+        }
+        if (showPolicy) PrivacyPolicyContent()
+        if (showServer && BuildConfig.DEBUG) {
             OutlinedTextField(
                 value = serverUrl,
                 onValueChange = { serverUrl = it },

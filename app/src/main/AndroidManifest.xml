@@ -9,10 +9,8 @@
     <!-- 자동 동기화: 앱이 꺼져 있을 때도 읽기 (Health Connect 가 지원하는 기기에서만) -->
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
 
-    <!-- 개발용: 테스트 러닝 기록 (삼성헬스 없이 보상 흐름 검증용, 출시 전 제거) -->
-    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
-    <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
-    <uses-permission android:name="android.permission.health.WRITE_STEPS" />
+    <!-- 주간 원정 목표 달성·레벨 업 알림 (Android 13 이상은 실행 중 허용 필요) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- 서버 동기화 -->
     <uses-permission android:name="android.permission.INTERNET" />

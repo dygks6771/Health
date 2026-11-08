@@ -17,6 +17,11 @@ curl localhost:8080/api/health   # {"status":"UP","database":"UP"}
 
 DB 접속 정보는 환경변수로 바꿀 수 있음: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `PORT`
 
+## 출시용 배포
+
+`deploy/docker-compose.prod.yml` = PostgreSQL + 서버(Dockerfile) + Caddy(자동 HTTPS). 절차는 `docs/RELEASE.md`.
+로그인 보호: 같은 아이디 15분 5회 / 같은 IP 20회 실패 시 잠시 차단, 같은 IP 회원가입 시간당 10회 (`game.auth.*`)
+
 ## 폰 연결 (USB 없이)
 
 서버를 켜면 콘솔에 폰 앱 **설정 > 서버 주소**에 넣을 주소가 출력된다.
@@ -86,6 +91,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\allow-phone-access.ps1
 | GET / POST | `/api/me/guild/hunts` · `/{slot}` | 모험자 길드 오늘의 토벌 5개 / 토벌 |
 | GET / POST | `/api/me/world` · `/{1~10}/dungeon` | 10개 지역·던전 / 던전 공략 |
 | GET / POST / DELETE | `/api/me/friends` · `/{id}/accept` · `/{id}` | 친구 목록·요청 `{"name"}` / 수락 / 삭제 |
+| POST | `/api/me/account/delete` `{"password"}` | 회원 탈퇴 (영웅·기록·친구·토큰·용병 친구 삭제) |
+| POST | `/api/auth/delete-account` `{"loginId","password"}` | 웹 탈퇴 페이지용 (`/delete-account.html`) |
+| GET | `/privacy.html` · `/delete-account.html` | 개인정보처리방침 · 계정 삭제 웹 페이지 (스토어 등록용) |
 | GET / POST | `/api/me/weekly` · `/api/me/weekly/claim` | 주간 원정 목표·진행·연속 기록·개인 기록·원정 지도 / 달성 보상 |
 | GET / POST | `/api/me/raid` | 레이드 정보 / 공격 `{"friendHeroIds":[4명]}` (주 1회) |
 | GET / POST | `/api/me/shop` · `/api/me/shop/{WEAPON\|ARMOR}/draw` | 상점 / 장비 뽑기 |
@@ -93,7 +101,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\allow-phone-access.ps1
 | GET | `/api/game/names/available?name=` | 영웅 이름 중복 확인 |
 | GET | `/api/me/auction?slot=` · `/api/me/auction/mine` | 경매장 판매 목록 / 내 판매 내역·등록 가능 장비 |
 | POST | `/api/me/auction` · `/{id}/buy` · `/{id}/cancel` | 등록 `{"itemId","price"}` / 구매 / 등록 취소 |
-| POST | `/api/dev/friend-bots` · `/api/dev/raid-reset` | **개발용** 친구 봇 4명 / 레이드 주간 제한 초기화 (`GAME_DEV_TOOLS=false` 면 비활성) |
+| POST | `/api/dev/friend-bots` | 용병 친구 4명 모집 (`GAME_DEV_TOOLS=false` 면 비활성) |
 
 ## 게임 규칙 (`game/` 패키지)
 

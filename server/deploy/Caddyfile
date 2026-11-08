@@ -1,0 +1,5 @@
+# DOMAIN(.env) 으로 들어오는 요청을 게임 서버로 전달. 인증서(HTTPS)는 Caddy 가 자동 발급·갱신
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy server:8080
+}
