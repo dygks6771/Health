@@ -24,6 +24,11 @@ server:
 game:
   # 일일 토벌 초기화, 하루 러닝 상한 기준 시간대
   zone: Asia/Seoul
+  auth:
+    # 같은 아이디 15분에 5회, 같은 IP 15분에 20회 로그인 실패 시 잠시 차단. 같은 IP 회원가입 1시간 10회
+    login-fails-per-id: 5
+    login-fails-per-ip: 20
+    signups-per-ip-per-hour: 10
   dev-tools:
     # 테스트용 친구 봇 생성 API (/api/dev/**). 실제 서비스 배포 시 반드시 false
     enabled: ${GAME_DEV_TOOLS:true}

@@ -16,6 +16,9 @@ class UnauthorizedException(message: String = "로그인이 필요합니다") : 
 /** 이미 있는 아이디·이름 등 */
 class ConflictException(message: String) : RuntimeException(message)
 
+/** 로그인 실패가 너무 많음 등 잠시 후 다시 시도해야 하는 요청 */
+class TooManyRequestsException(message: String) : RuntimeException(message)
+
 data class ErrorResponse(val code: String, val message: String)
 
 @RestControllerAdvice
@@ -32,6 +35,10 @@ class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException::class)
     @ResponseStatus(HttpStatus.CONFLICT)
     fun handleConflict(e: ConflictException) = ErrorResponse("CONFLICT", e.message ?: "conflict")
+
+    @ExceptionHandler(TooManyRequestsException::class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    fun handleTooMany(e: TooManyRequestsException) = ErrorResponse("TOO_MANY_REQUESTS", e.message ?: "too many requests")
 
     @ExceptionHandler(BadRequestException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

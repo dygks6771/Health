@@ -57,6 +57,11 @@ interface AccountRepository : JpaRepository<Account, Long> {
     fun findByLoginId(loginId: String): Account?
 
     fun existsByLoginId(loginId: String): Boolean
+
+    /** 계정 삭제: DB 의 ON DELETE CASCADE 로 영웅·장비·기록·친구·토큰까지 함께 삭제 */
+    @Modifying
+    @Query(value = "delete from accounts where id = :id", nativeQuery = true)
+    fun hardDelete(id: Long): Int
 }
 
 interface AuthTokenRepository : JpaRepository<AuthToken, Long> {

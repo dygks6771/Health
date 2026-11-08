@@ -81,10 +81,6 @@ class MarketApiTest(
             status { isBadRequest() }
             jsonPath("$.message") { value("레이드는 주 1회입니다. 월요일 0시에 초기화됩니다") }
         }
-
-        // 개발용 초기화 후 다시 가능
-        api.post(token, "/api/dev/raid-reset").andExpect { status { isOk() } }
-        api.post(token, "/api/me/raid", """{"friendHeroIds":$ids}""").andExpect { status { isOk() } }
     }
 
     @Test

@@ -9,3 +9,7 @@ game:
   zone: Asia/Seoul
   dev-tools:
     enabled: true
+  # 테스트는 같은 IP(127.0.0.1)에서 계정을 많이 만들므로 IP 제한을 사실상 끔 (아이디별 제한은 그대로)
+  auth:
+    login-fails-per-ip: 100000
+    signups-per-ip-per-hour: 100000

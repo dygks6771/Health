@@ -134,7 +134,8 @@ class GameApiTest(
         assertEquals(30, cleared["hero"]["stamina"].asInt())
         api.post(token, "/api/me/world/2/dungeon").andExpect {
             status { isBadRequest() }
-            jsonPath("$.message") { value("레벨 6 필요, 능력치 합계 44 필요") }
+            // 능력치 합계 조건은 방금 던전에서 나온 장비(60% 확률, 자동 장착)에 따라 충족될 수도 있음
+            jsonPath("$.message") { value(org.hamcrest.Matchers.startsWith("레벨 6 필요")) }
         }
         // 원정 지도: 지역 3 은 누적 15km 필요 (지금 5km)
         assertEquals(5.0, world["totalKm"].asDouble())
