@@ -1,5 +1,6 @@
 package com.example.health.auth
 
+import com.example.health.settings.ServerAddressHelp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -120,11 +121,7 @@ fun AuthScreen(session: Session, api: ApiClient, onLoggedIn: () -> Unit) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text(
-                "USB: adb reverse tcp:8080 tcp:8080 후 http://127.0.0.1:8080\n와이파이: http://<PC IP>:8080",
-                color = ParchmentDim,
-                style = MaterialTheme.typography.bodySmall,
-            )
+            ServerAddressHelp()
         }
     }
 }

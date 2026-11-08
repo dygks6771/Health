@@ -5,7 +5,9 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -15,7 +17,11 @@ import com.example.health.net.Session
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/** 앱을 열지 않아도 1시간마다 러닝 기록을 서버로 동기화 */
+/**
+ * 앱을 열지 않아도 러닝·걸음 기록을 서버로 자동 동기화.
+ * - 15분마다 (안드로이드가 허용하는 최소 주기. 배터리 절약 모드에서는 더 늦어질 수 있음)
+ * - 동기화가 네트워크·서버 문제로 실패하면, 인터넷이 연결되는 대로 다시 시도 ([syncSoon])
+ */
 class SyncWorker(
     context: Context,
     params: WorkerParameters,
@@ -46,18 +52,35 @@ class SyncWorker(
 
     companion object {
         private const val WORK_NAME = "run-sync"
+        private const val SOON_WORK_NAME = "run-sync-soon"
+        private const val INTERVAL_MINUTES = 15L
 
         /** 이전 버전(걸음수 동기화)에서 예약한 작업. 클래스 이름이 바뀌어 실행되지 않으므로 취소 */
         private const val OLD_WORK_NAME = "steps-sync"
 
-        /** 이미 예약돼 있으면 그대로 둔다 (앱을 열 때마다 호출해도 됨) */
+        private val NETWORK = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+
+        /** 주기 동기화 예약 (앱을 열 때마다 호출해도 됨. 주기가 바뀌었으면 새 주기로 갱신) */
         fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            val request = PeriodicWorkRequestBuilder<SyncWorker>(INTERVAL_MINUTES, TimeUnit.MINUTES)
+                .setConstraints(NETWORK)
                 .build()
             val workManager = WorkManager.getInstance(context)
             workManager.cancelUniqueWork(OLD_WORK_NAME)
-            workManager.enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+            workManager.enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
+        }
+
+        /**
+         * 인터넷이 연결되는 즉시 한 번 동기화 (지금 서버에 닿지 않을 때 호출).
+         * 실패하면 WorkManager 가 간격을 늘려가며 다시 시도한다.
+         */
+        fun syncSoon(context: Context) {
+            val request = OneTimeWorkRequestBuilder<SyncWorker>()
+                .setConstraints(NETWORK)
+                .setInitialDelay(1, TimeUnit.MINUTES)
+                .build()
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork(SOON_WORK_NAME, ExistingWorkPolicy.KEEP, request)
         }
     }
 }

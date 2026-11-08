@@ -73,14 +73,18 @@ fun SettingsScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text("USB: adb reverse tcp:8080 tcp:8080 후 http://127.0.0.1:8080\n와이파이: http://<PC IP>:8080", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+            ServerAddressHelp()
             GhostButton(
                 "저장 후 연결 확인",
                 onClick = {
                     actions.run {
                         session.serverUrl = serverUrl
+                        serverUrl = session.serverUrl // 정리된 주소(http:// 추가 등)를 입력란에 반영
+                        val started = System.currentTimeMillis()
                         val health = api.health()
-                        "서버 ${health.optString("status")} / DB ${health.optString("database")}"
+                        val ms = System.currentTimeMillis() - started
+                        "✔ 연결됨 (${ms}ms) · 서버 ${health.optString("status")} / DB ${health.optString("database")}\n" +
+                            "이제 USB 없이 이 주소로 자동 동기화됩니다"
                     }
                 },
                 enabled = !actions.busy,

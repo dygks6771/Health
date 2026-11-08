@@ -17,6 +17,48 @@ curl localhost:8080/api/health   # {"status":"UP","database":"UP"}
 
 DB 접속 정보는 환경변수로 바꿀 수 있음: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `PORT`
 
+## 폰 연결 (USB 없이)
+
+서버를 켜면 콘솔에 폰 앱 **설정 > 서버 주소**에 넣을 주소가 출력된다.
+
+```
+==================== 폰 앱 > 설정 > 서버 주소 ====================
+  USB 연결 (adb reverse tcp:8080 tcp:8080) : http://127.0.0.1:8080
+  밖에서 (Tailscale)  : http://100.101.5.7:8080   [Tailscale]
+  같은 와이파이        : http://192.168.0.10:8080   [Wi-Fi]
+```
+
+| 방법 | 언제 | 준비 |
+|---|---|---|
+| USB | 개발 중 | `adb reverse tcp:8080 tcp:8080` (연결할 때마다) |
+| 같은 와이파이 | 집에서 | 방화벽 열기(아래 1회). PC 가 같은 공유기에 연결돼 있어야 함 |
+| 밖에서 (Tailscale) | 밖에서 뛰고 와도 자동 동기화 | PC·폰에 [Tailscale](https://tailscale.com/download) 설치 후 같은 계정 로그인, 폰에서 Tailscale 켜 두기 |
+
+**방화벽 열기 (1회)**: PowerShell 을 관리자 권한으로 실행한 뒤
+
+```powershell
+cd <프로젝트>\server
+powershell -ExecutionPolicy Bypass -File .\scripts\allow-phone-access.ps1
+```
+
+같은 공유기와 Tailscale 에서 오는 접속만 허용하고, 끝나면 입력할 주소를 보여 준다.
+
+- Tailscale 은 내 기기끼리만 연결되는 사설망이라 서버가 인터넷 전체에 공개되지 않는다. 공유기 포트포워딩은 하지 않는다.
+- PC 가 꺼지거나 절전 모드면 동기화되지 않는다 (앱이 연결되는 대로 다시 시도함). 장시간 쓰려면 Windows 전원 설정에서 절전 모드를 끈다.
+- 친구 폰도 연결하려면 Tailscale 에서 PC 를 친구 계정에 공유하거나(Share), ngrok 같은 https 터널 주소를 쓴다. 이때는 `GAME_DEV_TOOLS=false` 로 개발용 API 를 끈다.
+- 디버그 빌드는 http:// 주소를 허용하고, 릴리스 빌드는 https:// 주소만 접속된다.
+
+### 앱 자동 동기화
+
+| 언제 | 동작 |
+|---|---|
+| 앱을 열거나 돌아올 때 | 즉시 동기화 |
+| 로비를 켜 둔 동안 | 5분마다 |
+| 앱이 꺼져 있을 때 | 15분마다 (WorkManager, 절전 모드에서는 늦어질 수 있음) |
+| 서버에 연결 실패 | 인터넷이 연결되면 다시 시도 (간격을 늘려가며) |
+
+같은 러닝은 Health Connect 기록 ID 로 한 번만 보상되므로 여러 번 동기화해도 중복되지 않는다.
+
 ## 테스트
 
 ```bash

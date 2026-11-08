@@ -47,9 +47,13 @@ import com.example.health.game.HeroInfo
 import com.example.health.game.Portraits
 import com.example.health.game.RunReward
 import com.example.health.health.RunReader
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import com.example.health.net.ApiException
+import com.example.health.net.ServerUnreachableException
 import com.example.health.net.Session
 import com.example.health.sync.RunSyncer
+import com.example.health.sync.SyncWorker
 import com.example.health.ui.fantasy.FantasyBar
 import com.example.health.ui.fantasy.GhostButton
 import com.example.health.ui.fantasy.GoldButton
@@ -64,6 +68,7 @@ import com.example.health.ui.theme.Mana
 import com.example.health.ui.theme.Parchment
 import com.example.health.ui.theme.ParchmentDim
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import org.json.JSONObject
@@ -133,8 +138,11 @@ fun LobbyScreen(
             throw e
         } catch (e: ApiException) {
             syncError = e.message
+        } catch (e: ServerUnreachableException) {
+            syncError = e.message + "\n(연결되면 자동으로 다시 동기화합니다)"
+            SyncWorker.syncSoon(context.applicationContext)
         } catch (e: Exception) {
-            syncError = "서버에 연결하지 못했습니다"
+            syncError = "동기화하지 못했습니다 (${e.message ?: e.javaClass.simpleName})"
         } finally {
             syncing = false
         }
@@ -147,6 +155,13 @@ fun LobbyScreen(
     LaunchedEffect(resumeKey) {
         runCatching { dailyClaimed = api.dailyStatus().getBoolean("claimedToday") }
         syncNow()
+        // 로비를 켜 둔 동안에도 주기적으로 동기화 (화면을 벗어나거나 앱을 내리면 자동으로 멈춤)
+        val lifecycle = (context as? LifecycleOwner)?.lifecycle
+        while (true) {
+            delay(FOREGROUND_SYNC_INTERVAL_MS)
+            // 앱이 뒤로 내려가 있으면 건너뜀 (그동안은 SyncWorker 가 담당)
+            if (lifecycle == null || lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) syncNow()
+        }
     }
 
     var menuOpen by remember { mutableStateOf(false) }
@@ -434,3 +449,6 @@ private val timeFormat = DateTimeFormatter.ofPattern("M/d HH:mm")
 
 private fun formatTime(epochMillis: Long): String =
     if (epochMillis <= 0) "없음" else timeFormat.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
+
+/** 로비를 켜 둔 동안 다시 동기화하는 간격 (5분) */
+private const val FOREGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000L
