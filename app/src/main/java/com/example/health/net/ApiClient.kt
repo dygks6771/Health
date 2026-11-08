@@ -155,6 +155,11 @@ class ApiClient(private val session: Session) {
     /** 개발용: 레이드 주 1회 제한 초기화 */
     suspend fun devRaidReset(): JSONObject = obj("POST", "/api/dev/raid-reset")
 
+    // ── 주간 원정 ──
+    suspend fun weekly(): JSONObject = obj("GET", "/api/me/weekly")
+
+    suspend fun claimWeekly(): JSONObject = obj("POST", "/api/me/weekly/claim")
+
     // ── 레이드 ──
     suspend fun raid(): JSONObject = obj("GET", "/api/me/raid")
 

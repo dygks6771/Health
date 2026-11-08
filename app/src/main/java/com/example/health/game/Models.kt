@@ -205,6 +205,8 @@ data class RunReward(
     val levelAfter: Int,
     val statPointsGained: Int,
     val rejected: List<String>,
+    /** 하루 10km 를 넘어 보상이 절반만 적용된 거리 */
+    val tiredKm: Double = 0.0,
 ) {
     val leveledUp: Boolean get() = levelAfter > levelBefore
 
@@ -218,6 +220,7 @@ data class RunReward(
             levelAfter = j.getInt("levelAfter"),
             statPointsGained = j.getInt("statPointsGained"),
             rejected = j.getJSONArray("rejected").strings(),
+            tiredKm = j.optDouble("tiredKm", 0.0),
         )
     }
 }
@@ -271,6 +274,8 @@ data class RegionInfo(
     val available: Boolean,
     val reasons: List<String>,
     val winChance: Int,
+    /** 원정 지도: 필요한 누적 러닝 거리 */
+    val requiredKm: Int = 0,
 ) {
     companion object {
         fun listFrom(j: JSONObject): List<RegionInfo> = j.getJSONArray("regions").mapObjects {
@@ -292,6 +297,7 @@ data class RegionInfo(
                 available = d.getBoolean("available"),
                 reasons = d.getJSONArray("reasons").strings(),
                 winChance = d.optInt("winChance", 100),
+                requiredKm = d.optInt("requiredKm", 0),
             )
         }
     }
@@ -325,7 +331,16 @@ data class RaidInfo(
     val bestGrade: String?,
     val bestDamage: Long?,
     val remainingThisWeek: Int,
+    /** 이번 주 내 러닝 거리와 레이드 데미지 배율 */
+    val myWeeklyKm: Double = 0.0,
+    val myRunBonus: Double = 1.0,
+    /** 친구 영웅 ID → 이번 주 러닝 거리 */
+    val friendWeeklyKm: Map<Long, Double> = emptyMap(),
+    val fullBonusKm: Double = 10.0,
 ) {
+    /** 이번 주 [km] 를 뛰었을 때 레이드 데미지 배율 (서버 RaidBoss.runBonus 와 같은 식) */
+    fun runBonus(km: Double): Double = 0.5 + (km / fullBonusKm).coerceIn(0.0, 1.0)
+
     companion object {
         fun from(j: JSONObject) = RaidInfo(
             bossName = j.getString("bossName"),
@@ -345,13 +360,28 @@ data class RaidInfo(
             bestGrade = j.stringOrNull("bestGrade"),
             bestDamage = j.longOrNull("bestDamage"),
             remainingThisWeek = j.optInt("remainingThisWeek", 1),
+            myWeeklyKm = j.optDouble("myWeeklyKm", 0.0),
+            myRunBonus = j.optDouble("myRunBonus", 1.0),
+            friendWeeklyKm = j.optJSONObject("friendWeeklyKm")?.let { m ->
+                m.keys().asSequence().associate { it.toLong() to m.getDouble(it) }
+            } ?: emptyMap(),
+            fullBonusKm = j.optDouble("fullBonusKm", 10.0),
         )
     }
 }
 
 data class RaidTurnInfo(val turn: Int, val damage: Long, val totalDamage: Long, val stage: Int, val stageName: String, val evolved: Boolean)
 
-data class RaidMember(val name: String, val job: String, val jobName: String, val appearance: Int, val damage: Long)
+data class RaidMember(
+    val name: String,
+    val job: String,
+    val jobName: String,
+    val appearance: Int,
+    val damage: Long,
+    val weeklyKm: Double = 0.0,
+    /** 러닝 배율 0.5 ~ 1.5 */
+    val runBonus: Double = 1.0,
+)
 
 data class RaidResult(
     val totalDamage: Long,
@@ -388,6 +418,7 @@ data class RaidResult(
                 RaidMember(
                     it.getString("name"), it.optString("job", "WARRIOR"), it.getString("jobName"),
                     it.optInt("appearance", 0), it.getLong("damage"),
+                    it.optDouble("weeklyKm", 0.0), it.optDouble("runBonus", 1.0),
                 )
             },
             rewardGold = j.getLong("rewardGold"),
@@ -468,3 +499,64 @@ data class Listing(
         fun listFrom(a: JSONArray): List<Listing> = a.mapObjects(::from)
     }
 }
+
+/** 주간 원정: 이번 주 개인 맞춤 목표 거리, 연속 달성, 하루별 거리, 개인 기록, 원정 지도 진행 */
+data class WeeklyInfo(
+    val goalKm: Double,
+    val progressKm: Double,
+    val achieved: Boolean,
+    val claimed: Boolean,
+    val streakBefore: Int,
+    val streakIfAchieved: Int,
+    val daysLeft: Int,
+    val runDays: Int,
+    /** 월~일 하루별 거리 */
+    val dayKm: List<Double>,
+    val rewardChestTier: String,
+    val rewardChestName: String,
+    val rewardGold: Long,
+    val rewardStones: Int,
+    val totalKm: Double,
+    val longestRunKm: Double,
+    val bestPaceSecPerKm: Int?,
+    val unlockedTier: Int,
+    val nextRegionName: String?,
+    val nextRegionKm: Int?,
+    val progressToNext: Double,
+) {
+    val progress: Float get() = if (goalKm <= 0) 0f else (progressKm / goalKm).toFloat().coerceIn(0f, 1f)
+    val remainingKm: Double get() = (goalKm - progressKm).coerceAtLeast(0.0)
+
+    companion object {
+        fun from(j: JSONObject): WeeklyInfo {
+            val chest = j.getJSONObject("rewardChest")
+            val records = j.getJSONObject("records")
+            val exp = j.getJSONObject("expedition")
+            return WeeklyInfo(
+                goalKm = j.getDouble("goalKm"),
+                progressKm = j.getDouble("progressKm"),
+                achieved = j.getBoolean("achieved"),
+                claimed = j.getBoolean("claimed"),
+                streakBefore = j.getInt("streakBefore"),
+                streakIfAchieved = j.getInt("streakIfAchieved"),
+                daysLeft = j.getInt("daysLeft"),
+                runDays = j.getInt("runDays"),
+                dayKm = j.getJSONArray("days").mapObjects { it.getDouble("km") },
+                rewardChestTier = chest.getString("tier"),
+                rewardChestName = chest.getString("name"),
+                rewardGold = j.getLong("rewardGold"),
+                rewardStones = j.getInt("rewardStones"),
+                totalKm = records.getDouble("totalKm"),
+                longestRunKm = records.getDouble("longestRunKm"),
+                bestPaceSecPerKm = records.intOrNull("bestPaceSecPerKm"),
+                unlockedTier = exp.getInt("unlockedTier"),
+                nextRegionName = exp.stringOrNull("nextRegionName"),
+                nextRegionKm = exp.intOrNull("nextRegionKm"),
+                progressToNext = exp.getDouble("progressToNext"),
+            )
+        }
+    }
+}
+
+/** 초/km → "6'30\"" */
+fun formatPace(secPerKm: Int?): String = secPerKm?.let { "%d'%02d\"".format(it / 60, it % 60) } ?: "-"

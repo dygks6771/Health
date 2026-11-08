@@ -54,12 +54,15 @@ private data class DungeonResult(val dungeon: String, val stones: Int, val gold:
 @Composable
 fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit, onBack: () -> Unit) {
     var regions by remember { mutableStateOf<List<RegionInfo>>(emptyList()) }
+    var totalKm by remember { mutableStateOf(0.0) }
     var result by remember { mutableStateOf<DungeonResult?>(null) }
     var battle by remember { mutableStateOf<BattleSpec?>(null) }
     val actions = rememberActions()
 
     suspend fun load() {
-        regions = RegionInfo.listFrom(api.world())
+        val json = api.world()
+        regions = RegionInfo.listFrom(json)
+        totalKm = json.optDouble("totalKm", 0.0)
     }
 
     LaunchedEffect(Unit) { actions.run { load(); null } }
@@ -76,7 +79,13 @@ fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
                     ResourceChip("Lv", "${hero.level}")
                     ResourceChip("능력치 합", "${hero.totalStats}")
                     ResourceChip("⚡", "${hero.stamina}")
+                    ResourceChip("🏃", "누적 %.1fkm".format(totalKm))
                 }
+                Text(
+                    "새 지역은 실제로 달린 누적 거리만큼 열립니다. 뛰어서 세계를 개척하세요!",
+                    color = ParchmentDim,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
         item {
@@ -97,7 +106,7 @@ fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
             }
         }
         items(regions, key = { it.tier }) { region ->
-            RegionCard(region, enabled = !actions.busy) {
+            RegionCard(region, totalKm, enabled = !actions.busy) {
                 actions.run {
                     val json = api.dungeon(region.tier)
                     onHeroJson(json.getJSONObject("hero"))
@@ -152,7 +161,24 @@ fun WorldScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit
 }
 
 @Composable
-private fun RegionCard(region: RegionInfo, enabled: Boolean, onEnter: () -> Unit) {
+private fun RegionCard(region: RegionInfo, totalKm: Double, enabled: Boolean, onEnter: () -> Unit) {
+    if (totalKm < region.requiredKm) {
+        // 아직 개척하지 못한 지역: 간단히 잠금 표시
+        Panel {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("🔒", fontSize = 28.sp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("${region.tier}. ${region.name}", style = MaterialTheme.typography.titleMedium, color = ParchmentDim)
+                    Text(
+                        "누적 ${region.requiredKm}km 달성 시 개척 · %.1fkm 남음".format(region.requiredKm - totalKm),
+                        color = ParchmentDim,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+        return
+    }
     Panel(highlight = region.available) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(Portraits.region(region.tier), fontSize = 34.sp)

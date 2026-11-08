@@ -3,25 +3,21 @@ package com.example.health.lobby
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import com.example.health.ui.fantasy.gradeColor
-import com.example.health.game.ItemInfo
-import com.example.health.net.ApiClient
-import com.example.health.ui.battle.ChestInfo
-import com.example.health.ui.battle.ChestReveal
-import com.example.health.ui.sprites.HeroAvatar
-import com.example.health.ui.sprites.ItemIcon
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -32,9 +28,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,23 +41,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
-import com.example.health.app.Screen
-import com.example.health.game.HeroInfo
-import com.example.health.game.Portraits
-import com.example.health.game.RunReward
-import com.example.health.health.RunReader
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
+import com.example.health.app.Screen
+import com.example.health.game.HeroInfo
+import com.example.health.game.ItemInfo
+import com.example.health.game.Portraits
+import com.example.health.game.RunReward
+import com.example.health.game.WeeklyInfo
+import com.example.health.game.formatPace
+import com.example.health.health.RunReader
+import com.example.health.net.ApiClient
 import com.example.health.net.ApiException
 import com.example.health.net.ServerUnreachableException
 import com.example.health.net.Session
 import com.example.health.sync.RunSyncer
 import com.example.health.sync.SyncWorker
+import com.example.health.ui.battle.ChestInfo
+import com.example.health.ui.battle.ChestReveal
 import com.example.health.ui.fantasy.FantasyBar
 import com.example.health.ui.fantasy.GhostButton
 import com.example.health.ui.fantasy.GoldButton
 import com.example.health.ui.fantasy.Panel
 import com.example.health.ui.fantasy.ResourceChip
+import com.example.health.ui.sprites.HeroAvatar
+import com.example.health.ui.sprites.ItemIcon
 import com.example.health.ui.theme.Crimson
 import com.example.health.ui.theme.Emerald
 import com.example.health.ui.theme.Gold
@@ -67,12 +74,13 @@ import com.example.health.ui.theme.GoldDim
 import com.example.health.ui.theme.Mana
 import com.example.health.ui.theme.Parchment
 import com.example.health.ui.theme.ParchmentDim
+import com.example.health.ui.theme.Track
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 import org.json.JSONObject
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -81,17 +89,23 @@ private data class MenuItem(val icon: String, val title: String, val subtitle: S
 private val menu = listOf(
     MenuItem("🗺️", "모험", "10개 지역 · 던전", Screen.WORLD),
     MenuItem("📜", "모험자 길드", "오늘의 토벌 의뢰", Screen.GUILD),
-    MenuItem("🐉", "레이드", "주 1회 · 마룡 토벌", Screen.RAID),
+    MenuItem("🐉", "레이드", "주 1회 · 파티 러닝", Screen.RAID),
     MenuItem("🏪", "상점", "장비 뽑기", Screen.SHOP),
     MenuItem("⚖️", "경매장", "유저 간 거래", Screen.AUCTION),
     MenuItem("⚒️", "대장간", "장비 강화", Screen.SMITH),
     MenuItem("🎒", "영웅 · 가방", "능력치 · 장비", Screen.BAG),
     MenuItem("🏆", "랭킹", "전체 모험가 순위", Screen.RANKING),
     MenuItem("👥", "친구", "동료 모집", Screen.FRIENDS),
-    MenuItem("⚙️", "설정", "서버 · 테스트 · 로그아웃", Screen.SETTINGS),
+    MenuItem("⚙️", "설정", "서버 · 기록 · 로그아웃", Screen.SETTINGS),
 )
 
-/** 로비: 영웅과 재화, 러닝 동기화, 메뉴. 화면에 돌아올 때마다 러닝 기록을 자동 동기화 */
+private val SLOTS = listOf("WEAPON" to "무기", "HELMET" to "투구", "ARMOR" to "갑옷", "BOOTS" to "장화", "ACCESSORY" to "목걸이")
+private val WEEKDAYS = listOf("월", "화", "수", "목", "금", "토", "일")
+
+/**
+ * 로비. 위에서부터 영웅 → 이번 주 원정(목표·연속 기록) → 원정 지도 → 출석·보상 → 장비 순.
+ * 화면에 돌아올 때마다, 그리고 켜 둔 동안 5분마다 러닝·걸음 기록을 자동 동기화한다.
+ */
 @Composable
 fun LobbyScreen(
     hero: HeroInfo,
@@ -104,9 +118,13 @@ fun LobbyScreen(
     val reader = remember { RunReader(context.applicationContext) }
     val syncer = remember { RunSyncer(reader, session) }
     val api = remember { ApiClient(session) }
-    var dailyClaimed by remember { mutableStateOf(true) }
-    var dailyChest by remember { mutableStateOf<ChestInfo?>(null) }
     val scope = rememberCoroutineScope()
+
+    var dailyClaimed by remember { mutableStateOf(true) }
+    var weekly by remember { mutableStateOf<WeeklyInfo?>(null) }
+    var claimingWeekly by remember { mutableStateOf(false) }
+    /** 열고 있는 보물 상자 (출석 · 주간 원정 보상) */
+    var openingChest by remember { mutableStateOf<ChestInfo?>(null) }
 
     var reward by remember { mutableStateOf<RunReward?>(null) }
     var stepStamina by remember { mutableStateOf(0 to 0) }
@@ -114,6 +132,11 @@ fun LobbyScreen(
     var syncing by remember { mutableStateOf(false) }
     var syncError by remember { mutableStateOf<String?>(null) }
     var lastSyncAt by remember { mutableLongStateOf(session.lastSyncAt) }
+    var menuOpen by remember { mutableStateOf(false) }
+
+    suspend fun refreshWeekly() {
+        runCatching { weekly = WeeklyInfo.from(api.weekly()) }
+    }
 
     suspend fun syncNow() {
         if (syncing) return
@@ -146,6 +169,58 @@ fun LobbyScreen(
         } finally {
             syncing = false
         }
+        refreshWeekly()
+    }
+
+    fun claimDaily() = scope.launch {
+        try {
+            val json = api.claimDaily()
+            onHeroJson(json.getJSONObject("hero"))
+            val chest = json.getJSONObject("chest")
+            val item = json.optJSONObject("item")?.let { ItemInfo.from(it) }
+            dailyClaimed = true
+            openingChest = ChestInfo(
+                chest.getString("tier"),
+                chest.getString("name"),
+                listOfNotNull(
+                    "골드 +${json.getLong("gold")}",
+                    "강화석 +${json.getInt("stones")}",
+                    item?.let { "획득: [${it.gradeName}] ${it.displayName}" },
+                ),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            syncError = e.message
+        }
+    }
+
+    fun claimWeekly() = scope.launch {
+        if (claimingWeekly) return@launch
+        claimingWeekly = true
+        try {
+            val json = api.claimWeekly()
+            onHeroJson(json.getJSONObject("hero"))
+            val chest = json.getJSONObject("chest")
+            val item = json.optJSONObject("item")?.let { ItemInfo.from(it) }
+            openingChest = ChestInfo(
+                chest.getString("tier"),
+                chest.getString("name"),
+                listOfNotNull(
+                    "🔥 ${json.getInt("streak")}주 연속 원정 달성!",
+                    "골드 +${json.getLong("gold")}",
+                    "강화석 +${json.getInt("stones")}",
+                    item?.let { "획득: [${it.gradeName}] ${it.displayName}" },
+                ),
+            )
+            refreshWeekly()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            syncError = e.message
+        } finally {
+            claimingWeekly = false
+        }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -154,6 +229,7 @@ fun LobbyScreen(
 
     LaunchedEffect(resumeKey) {
         runCatching { dailyClaimed = api.dailyStatus().getBoolean("claimedToday") }
+        refreshWeekly()
         syncNow()
         // 로비를 켜 둔 동안에도 주기적으로 동기화 (화면을 벗어나거나 앱을 내리면 자동으로 멈춤)
         val lifecycle = (context as? LifecycleOwner)?.lifecycle
@@ -164,110 +240,47 @@ fun LobbyScreen(
         }
     }
 
-    var menuOpen by remember { mutableStateOf(false) }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                ResourceChip("💰", "%,d".format(hero.gold))
-                ResourceChip("⚡", "${hero.stamina}/${hero.maxStamina}")
-                ResourceChip("💎", "${hero.enhanceStones}")
-                Box(modifier = Modifier.weight(1f))
-                // 메뉴는 우측 상단에 작게
-                Text(
-                    "☰",
-                    color = Gold,
-                    fontSize = 22.sp,
-                    modifier = Modifier
-                        .border(1.dp, GoldDim, RoundedCornerShape(8.dp))
-                        .clickable { menuOpen = true }
-                        .padding(horizontal = 10.dp, vertical = 2.dp),
-                )
-            }
-
-            if (!dailyClaimed) {
-                Panel(title = "🎁 오늘의 출석 보상", highlight = true) {
-                    Text("하루 한 번 보물 상자를 열 수 있어요. 황금 상자에는 장비가 들어 있습니다!", color = Parchment, style = MaterialTheme.typography.bodySmall)
-                    GoldButton(
-                        "상자 받기",
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    val json = api.claimDaily()
-                                    onHeroJson(json.getJSONObject("hero"))
-                                    val chest = json.getJSONObject("chest")
-                                    val item = json.optJSONObject("item")?.let { ItemInfo.from(it) }
-                                    dailyClaimed = true
-                                    dailyChest = ChestInfo(
-                                        chest.getString("tier"),
-                                        chest.getString("name"),
-                                        listOfNotNull(
-                                            "골드 +${json.getLong("gold")}",
-                                            "강화석 +${json.getInt("stones")}",
-                                            item?.let { "획득: [${it.gradeName}] ${it.displayName}" },
-                                        ),
-                                    )
-                                } catch (e: CancellationException) {
-                                    throw e
-                                } catch (e: Exception) {
-                                    syncError = e.message
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-
-            HeroPanel(hero)
-            EquipmentPanel(hero)
+            TopBar(hero, onMenu = { menuOpen = true })
 
             if (needPermission) {
-                Panel(title = "운동 기록 권한 필요", highlight = true) {
-                    Text("러닝(경험치)과 걸음수(행동력)를 읽으려면 Health Connect 의 운동·거리·걸음수 읽기를 허용해 주세요.", color = Parchment)
-                    GoldButton("권한 허용하기", onClick = { permissionLauncher.launch(reader.requestPermissions) })
-                }
-            }
-            if (reward != null || stepStamina.first > 0 || stepStamina.second > 0) {
-                RewardPanel(reward, stepStamina.first, stepStamina.second)
-            }
-            if (hero.stamina < 10) {
-                Panel(title = "💡 행동력이 부족해요") {
+                Panel(title = "운동 기록 권한이 필요해요", highlight = true) {
                     Text(
-                        "걸으면 행동력이 찹니다 (100보 = 1, 하루 최대 ${hero.dailyStepStaminaCap}). 러닝은 경험치와 골드를 줍니다.",
+                        "러닝(경험치·원정)과 걸음수(행동력)를 읽으려면 Health Connect 의 운동·거리·걸음수 읽기를 허용해 주세요.",
                         color = Parchment,
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    GoldButton("권한 허용하기", onClick = { permissionLauncher.launch(reader.requestPermissions) }, modifier = Modifier.fillMaxWidth())
                 }
             }
 
-            syncError?.let { Text("⚠ $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    if (syncing) "러닝 기록 동기화 중..." else "마지막 동기화: ${formatTime(lastSyncAt)}",
-                    color = ParchmentDim,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                GhostButton("동기화", onClick = { scope.launch { syncNow() } }, enabled = !syncing)
+            HeroCard(hero)
+
+            weekly?.let { WeeklyCard(it, claiming = claimingWeekly, onClaim = { claimWeekly() }) }
+
+            if (reward != null || stepStamina.first > 0 || stepStamina.second > 0) {
+                RewardPanel(reward, stepStamina.first, stepStamina.second)
             }
+
+            if (!dailyClaimed) DailyChestRow(onClaim = { claimDaily() })
+
+            weekly?.let { ExpeditionCard(it, onOpen = { onNavigate(Screen.WORLD) }) }
+
+            EquipmentStrip(hero, onOpen = { onNavigate(Screen.BAG) })
+
+            SyncStatus(syncing, syncError, lastSyncAt, onSync = { scope.launch { syncNow() } })
+
             // 아래 바로가기 바에 가리지 않도록 여백
-            Text("", modifier = Modifier.padding(bottom = 84.dp))
+            Spacer(modifier = Modifier.height(84.dp))
         }
 
         QuickBar(modifier = Modifier.align(Alignment.BottomCenter), onNavigate = onNavigate)
 
-        dailyChest?.let { chest ->
+        openingChest?.let { chest ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -276,7 +289,7 @@ fun LobbyScreen(
                     .padding(20.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                ChestReveal(chest, onDone = { dailyChest = null })
+                ChestReveal(chest, onDone = { openingChest = null })
             }
         }
 
@@ -288,6 +301,281 @@ fun LobbyScreen(
                 },
                 onClose = { menuOpen = false },
             )
+        }
+    }
+}
+
+/** 재화 + 우측 상단 메뉴 */
+@Composable
+private fun TopBar(hero: HeroInfo, onMenu: () -> Unit) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        ResourceChip("💰", "%,d".format(hero.gold))
+        ResourceChip("⚡", "${hero.stamina}")
+        ResourceChip("💎", "${hero.enhanceStones}")
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            "☰",
+            color = Gold,
+            fontSize = 22.sp,
+            modifier = Modifier
+                .border(1.dp, GoldDim, RoundedCornerShape(8.dp))
+                .clickable(onClick = onMenu)
+                .padding(horizontal = 10.dp, vertical = 2.dp),
+        )
+    }
+}
+
+/** 영웅: 초상 · 이름 · 레벨 · 전투력 + 경험치/행동력 바 */
+@Composable
+private fun HeroCard(hero: HeroInfo) {
+    Panel(highlight = true) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            HeroAvatar(hero.job, hero.appearance, 92.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                Text(hero.name, style = MaterialTheme.typography.headlineSmall, color = GoldBright)
+                Text(
+                    "Lv.${hero.level}  ${Portraits.job(hero.job)} ${hero.jobName}",
+                    color = Parchment,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text("⚔ 전투력 %,d".format(hero.power), color = Gold, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+        LabeledBar("경험치", "${hero.expInLevel} / ${hero.expToNextLevel}", hero.expProgress, Mana)
+        LabeledBar(
+            "행동력",
+            "${hero.stamina} / ${hero.maxStamina} · 오늘 걸음 +${hero.todayStepStamina}/${hero.dailyStepStaminaCap}",
+            hero.staminaProgress,
+            Emerald,
+        )
+        if (hero.statPoints > 0) {
+            Text(
+                "✦ 능력치 포인트 ${hero.statPoints} 개를 찍을 수 있어요 (영웅 · 가방)",
+                color = GoldBright,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LabeledBar(label: String, value: String, progress: Float, color: Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+            Text(value, color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+        }
+        FantasyBar(progress, color)
+    }
+}
+
+/** 이번 주 원정: 개인 맞춤 목표 거리 · 진행 · 요일별 거리 · 연속 달성 · 보상 */
+@Composable
+private fun WeeklyCard(w: WeeklyInfo, claiming: Boolean, onClaim: () -> Unit) {
+    Panel(highlight = w.achieved && !w.claimed) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("🏃 이번 주 원정", style = MaterialTheme.typography.titleMedium, color = Gold, modifier = Modifier.weight(1f))
+            val streak = if (w.achieved) w.streakIfAchieved else w.streakBefore
+            if (streak > 0) Text("🔥 ${streak}주 연속", color = GoldBright, fontWeight = FontWeight.Bold)
+        }
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("%.1f".format(w.progressKm), color = GoldBright, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            Text(" / %.1f km".format(w.goalKm), color = Parchment, fontSize = 18.sp, modifier = Modifier.padding(bottom = 5.dp))
+        }
+        FantasyBar(w.progress, if (w.achieved) GoldBright else Emerald)
+        Text(
+            when {
+                w.claimed -> "✔ 이번 주 원정 완료! 다음 주 월요일에 새 목표가 열려요"
+                w.achieved -> "목표 달성! 보상 상자를 열어 보세요"
+                else -> "%.1fkm 남음 · ${w.daysLeft}일 남음 · 이번 주 ${w.runDays}일 뜀".format(w.remainingKm)
+            },
+            color = if (w.achieved) GoldBright else ParchmentDim,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        WeekChart(w.dayKm)
+        if (!w.claimed) {
+            Text(
+                "달성 보상: ${w.rewardChestName} · 골드 %,d · 강화석 ${w.rewardStones}".format(w.rewardGold) +
+                    if (w.streakIfAchieved < 3) "  (3주 연속이면 황금 상자)" else "",
+                color = ParchmentDim,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        if (w.achieved && !w.claimed) {
+            GoldButton(if (claiming) "..." else "원정 보상 받기", onClick = onClaim, enabled = !claiming, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/** 월~일 막대 그래프 (오늘 강조) */
+@Composable
+private fun WeekChart(dayKm: List<Double>) {
+    val today = LocalDate.now().dayOfWeek.value - 1
+    val max = (dayKm.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        dayKm.forEachIndexed { i, km ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(if (km > 0) "%.1f".format(km) else "", color = ParchmentDim, fontSize = 10.sp)
+                Box(
+                    modifier = Modifier
+                        .width(24.dp)
+                        .height(44.dp)
+                        .background(Track, RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    if (km > 0) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height((km / max * 44).coerceAtLeast(4.0).dp)
+                                .background(if (i == today) GoldBright else Emerald, RoundedCornerShape(4.dp)),
+                        )
+                    }
+                }
+                Text(
+                    WEEKDAYS.getOrElse(i) { "" },
+                    color = if (i == today) GoldBright else ParchmentDim,
+                    fontSize = 11.sp,
+                    fontWeight = if (i == today) FontWeight.Bold else FontWeight.Normal,
+                )
+            }
+        }
+    }
+}
+
+/** 원정 지도: 누적 거리로 열리는 10개 지역 + 개인 기록 */
+@Composable
+private fun ExpeditionCard(w: WeeklyInfo, onOpen: () -> Unit) {
+    Panel(modifier = Modifier.clickable(onClick = onOpen)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("🗺️ 원정 지도", style = MaterialTheme.typography.titleMedium, color = Gold, modifier = Modifier.weight(1f))
+            Text("누적 %.1f km".format(w.totalKm), color = Parchment, fontWeight = FontWeight.SemiBold)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            (1..10).forEach { tier ->
+                val unlocked = tier <= w.unlockedTier
+                val next = tier == w.unlockedTier + 1
+                Box(
+                    modifier = Modifier
+                        .size(if (next) 18.dp else 14.dp)
+                        .background(if (unlocked) Gold else Track, CircleShape)
+                        .border(1.dp, if (next) GoldBright else Color.Transparent, CircleShape),
+                )
+            }
+        }
+        if (w.nextRegionName != null && w.nextRegionKm != null) {
+            FantasyBar(w.progressToNext.toFloat(), Gold)
+            Text(
+                "다음 지역 「${w.nextRegionName}」까지 %.1fkm".format((w.nextRegionKm - w.totalKm).coerceAtLeast(0.0)),
+                color = ParchmentDim,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        } else {
+            Text("모든 지역을 개척했습니다! 🏰", color = GoldBright, style = MaterialTheme.typography.bodySmall)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            RecordCell("최장 거리", "%.1f km".format(w.longestRunKm))
+            RecordCell("최고 페이스", formatPace(w.bestPaceSecPerKm) + " /km")
+            RecordCell("이번 주", "${w.runDays}일")
+        }
+    }
+}
+
+@Composable
+private fun RecordCell(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = Parchment, fontWeight = FontWeight.Bold)
+        Text(label, color = ParchmentDim, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun DailyChestRow(onClaim: () -> Unit) {
+    Panel(highlight = true) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("🎁", fontSize = 28.sp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("오늘의 출석 상자", color = Gold, fontWeight = FontWeight.Bold)
+                Text("하루 한 번 · 황금 상자엔 장비가!", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+            }
+            GoldButton("열기", onClick = onClaim)
+        }
+    }
+}
+
+/** 장착 장비 5칸을 한 줄로 (누르면 영웅 · 가방) */
+@Composable
+private fun EquipmentStrip(hero: HeroInfo, onOpen: () -> Unit) {
+    Panel(modifier = Modifier.clickable(onClick = onOpen)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("🛡 장착 장비", style = MaterialTheme.typography.titleMedium, color = Gold, modifier = Modifier.weight(1f))
+            Text("관리 ▶", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            SLOTS.forEach { (slot, label) ->
+                val item = hero.equipment.firstOrNull { it.slot == slot }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    ItemIcon(item, 46.dp, emptySlot = slot)
+                    Text(
+                        item?.let { if (it.enhance > 0) "+${it.enhance}" else label } ?: label,
+                        color = if (item != null) Parchment else ParchmentDim,
+                        fontSize = 11.sp,
+                    )
+                }
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            hero.stats.forEach { s ->
+                Text("${s.name} ${s.total}", color = Parchment, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RewardPanel(r: RunReward?, stamina: Int, overflow: Int) {
+    Panel(title = "✨ 새 활동 보상", highlight = true) {
+        if (r != null) {
+            if (r.leveledUp) {
+                Text("🎉 레벨 업! Lv.${r.levelBefore} → Lv.${r.levelAfter}  (포인트 +${r.statPointsGained})", color = GoldBright, fontWeight = FontWeight.Bold)
+            }
+            Text("🏃 러닝 %.2fkm → EXP +${r.expGained} · 골드 +${r.goldGained}".format(r.countedKm), color = Gold)
+            if (r.tiredKm > 0.01) {
+                Text(
+                    "하루 10km 를 넘은 %.1fkm 는 보상 절반이에요. 무리하지 말고 내일 또 뛰어요!".format(r.tiredKm),
+                    color = ParchmentDim,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            r.rejected.forEach { Text("⚠ 보상 제외: $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
+        }
+        if (stamina > 0) Text("👣 걸음 → 행동력 +$stamina", color = Gold)
+        if (overflow > 0) {
+            Text("행동력이 가득 차서 $overflow 은(는) 받지 못했어요. 컨텐츠에 써 주세요!", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun SyncStatus(syncing: Boolean, error: String?, lastSyncAt: Long, onSync: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        error?.let { Text("⚠ $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                if (syncing) "기록 동기화 중..." else "마지막 동기화 ${formatTime(lastSyncAt)} · 자동 동기화 켜짐",
+                color = ParchmentDim,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            GhostButton("지금 동기화", onClick = onSync, enabled = !syncing)
         }
     }
 }
@@ -344,89 +632,11 @@ private fun MenuOverlay(onSelect: (Screen) -> Unit, onClose: () -> Unit) {
             menu.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     row.forEach { item -> MenuTile(item, Modifier.weight(1f)) { onSelect(item.screen) } }
-                    if (row.size == 1) Column(modifier = Modifier.weight(1f)) {}
+                    if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
                 }
             }
             GhostButton("닫기", onClick = onClose, modifier = Modifier.fillMaxWidth())
         }
-    }
-}
-
-/** 장착 장비 4칸 */
-@Composable
-private fun EquipmentPanel(hero: HeroInfo) {
-    Panel(title = "장착 장비") {
-        listOf("WEAPON" to "무기", "HELMET" to "투구", "ARMOR" to "갑옷", "BOOTS" to "장화", "ACCESSORY" to "목걸이").forEach { (slot, label) ->
-            val item = hero.equipment.firstOrNull { it.slot == slot }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ItemIcon(item, 40.dp, emptySlot = slot)
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        item?.let { "[${it.gradeName}] ${it.displayName}" } ?: "$label — 비어 있음",
-                        color = item?.let { gradeColor(it.gradeName) } ?: ParchmentDim,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (item != null) Text(item.statText, color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            hero.stats.forEach { s ->
-                Text("${s.name} ${s.total}", color = Parchment, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeroPanel(hero: HeroInfo) {
-    Panel(highlight = true) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                HeroAvatar(hero.job, hero.appearance, 110.dp)
-                Text("${Portraits.job(hero.job)} ${hero.jobName}", color = Gold, style = MaterialTheme.typography.labelLarge)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
-                Text(hero.name, style = MaterialTheme.typography.headlineSmall, color = GoldBright)
-                Text("Lv.${hero.level} · ${hero.jobRole}", color = Parchment, fontWeight = FontWeight.SemiBold)
-                Text("⚔ 전투력 %,d".format(hero.power), color = Gold, style = MaterialTheme.typography.titleMedium)
-                Text("🏃 오늘 %.2fkm · 이번 주 %.1fkm".format(hero.todayRewardKm, hero.weekKm), color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
-                Text(
-                    "👣 오늘 %,d보 · 행동력 +${hero.todayStepStamina}/${hero.dailyStepStaminaCap}".format(hero.todaySteps),
-                    color = ParchmentDim,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                if (hero.todayKm - hero.todayRewardKm > 0.01) {
-                    Text(
-                        "⚠ 오늘 %.2fkm 중 %.2fkm 는 보상 제외 (설정 → 최근 러닝 기록)".format(hero.todayKm, hero.todayKm - hero.todayRewardKm),
-                        color = Crimson,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        }
-        Text("EXP ${hero.expInLevel} / ${hero.expToNextLevel}", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
-        FantasyBar(hero.expProgress, Mana)
-        Text("행동력 ${hero.stamina} / ${hero.maxStamina}  (걸음 100보 = 1)", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
-        FantasyBar(hero.staminaProgress, Emerald)
-        if (hero.statPoints > 0) {
-            Text("✦ 사용하지 않은 능력치 포인트 ${hero.statPoints} — 영웅 · 가방에서 찍으세요", color = GoldBright, style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
-
-@Composable
-private fun RewardPanel(r: RunReward?, stamina: Int, overflow: Int) {
-    Panel(title = "🏃 활동 보상", highlight = true) {
-        if (r != null) {
-            if (r.leveledUp) {
-                Text("🎉 레벨 업! Lv.${r.levelBefore} → Lv.${r.levelAfter}  (포인트 +${r.statPointsGained})", color = GoldBright, fontWeight = FontWeight.Bold)
-            }
-            Text("러닝 ${r.newRuns}건 · %.2fkm → EXP +${r.expGained} · 골드 +${r.goldGained}".format(r.countedKm), color = Gold)
-            r.rejected.forEach { Text("⚠ 보상 제외: $it", color = Crimson, style = MaterialTheme.typography.bodySmall) }
-        }
-        if (stamina > 0) Text("👣 걸음 → 행동력 +$stamina", color = Gold)
-        if (overflow > 0) Text("행동력이 가득 차서 $overflow 은(는) 받지 못했어요. 컨텐츠에 써 주세요!", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -436,11 +646,11 @@ private fun MenuTile(item: MenuItem, modifier: Modifier, onClick: () -> Unit) {
         modifier = modifier
             .border(1.dp, GoldDim, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(vertical = 10.dp, horizontal = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(item.icon, fontSize = 30.sp)
-        Text(item.title, color = Gold, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        Text(item.icon, fontSize = 26.sp)
+        Text(item.title, color = Gold, style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
         Text(item.subtitle, color = ParchmentDim, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
     }
 }

@@ -86,6 +86,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\allow-phone-access.ps1
 | GET / POST | `/api/me/guild/hunts` · `/{slot}` | 모험자 길드 오늘의 토벌 5개 / 토벌 |
 | GET / POST | `/api/me/world` · `/{1~10}/dungeon` | 10개 지역·던전 / 던전 공략 |
 | GET / POST / DELETE | `/api/me/friends` · `/{id}/accept` · `/{id}` | 친구 목록·요청 `{"name"}` / 수락 / 삭제 |
+| GET / POST | `/api/me/weekly` · `/api/me/weekly/claim` | 주간 원정 목표·진행·연속 기록·개인 기록·원정 지도 / 달성 보상 |
 | GET / POST | `/api/me/raid` | 레이드 정보 / 공격 `{"friendHeroIds":[4명]}` (주 1회) |
 | GET / POST | `/api/me/shop` · `/api/me/shop/{WEAPON\|ARMOR}/draw` | 상점 / 장비 뽑기 |
 | GET | `/api/ranking` | 전체 랭킹 + 내 순위 |
@@ -96,11 +97,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\allow-phone-access.ps1
 
 ## 게임 규칙 (`game/` 패키지)
 
-**러닝 보상** — 1km 당 EXP 50 · 골드 20, **상한 없음** (평균 시속 25km 초과 기록만 제외)
+**러닝 보상** — 1km 당 EXP 50 · 골드 20, **상한 없음** (평균 시속 25km 초과 기록만 제외).
+부상 예방: 하루 10km 를 넘는 거리는 보상 50% (`GameRules.FULL_REWARD_KM_PER_DAY`)
+
+**주간 원정** (`/api/me/weekly`, `/api/me/weekly/claim`) — 이번 주 목표 = 지난 4주 중 뛴 주의 평균 × 1.1 (0.5km 단위, 5~50km).
+주가 시작될 때 정해져 주 중간에 바뀌지 않음. 달성하면 은 상자, **3주 연속부터 황금 상자**(장비). 연속 주가 길수록 골드·강화석 증가(최대 5주).
+개인 기록(누적·최장 거리·최고 페이스)과 요일별 거리도 함께 응답
+
+**원정 지도** — 지역은 누적 러닝 거리로 열림: 0 / 5 / 15 / 30 / 50 / 75 / 105 / 140 / 180 / 225km (레벨·능력치 조건과 별개)
 
 **걸음 보상** — 100보 = 행동력 1, 하루 최대 150 (15,000보), 보유 최대 300. `POST /api/me/steps`
 
 **영웅** — 직업 5종(기사·전사·궁수·마법사·성직자). 생성 시 주 능력치 +3, 보조 +2.
+레벨업 필요 EXP = 100 + 30 × (레벨-1) (Lv1→2 는 2km, Lv20→21 은 약 13km).
 레벨업마다 포인트 3 + 주 능력치 +1. 전투력 = 능력치 합 × 3 + 레벨 × 10
 
 **장비** — 무기(공격력)·투구(방어력)·갑옷(방어력)·장화(민첩성)·목걸이(정신력). 등급 일반~전설, 수치 = (3 + 3×티어) × 등급배율.
@@ -125,6 +134,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\allow-phone-access.ps1
 **경매장** — 미장착 장비를 즉시 구매가로 등록 (최대 10개), 판매 시 수수료 5%. 등록 중인 장비는 장착·강화·판매 불가
 
 **레이드** (`game/Raid.kt`) — 주 1회(월요일 0시 초기화). 본인 + 친구 4명, 10턴. 누적 데미지 3,000 / 9,000 / 20,000 에서 마룡이 진화하며 받는 피해 100% → 45%.
+각자의 데미지에 **이번 주 러닝 거리 배율**: 0km ×0.5 → 10km 이상 ×1.5 (테스트 봇은 6km 로 계산).
 총 데미지로 F~S 등급 (S 30,000+), A 이상은 목걸이 보상
 
 ## 구조

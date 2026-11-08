@@ -108,6 +108,11 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
                 color = if (raid.remainingThisWeek > 0) Gold else Crimson,
                 fontWeight = FontWeight.Bold,
             )
+            Text(
+                "🏃 파티원 각자의 이번 주 러닝 거리가 데미지 배율이 됩니다 (0km ×0.5 → %.0fkm 이상 ×1.5). 함께 뛰어야 높은 등급!".format(raid.fullBonusKm),
+                color = GoldBright,
+                style = MaterialTheme.typography.bodySmall,
+            )
             raid.stages.forEach { s ->
                 Text(
                     "${s.stage}단계 ${s.name} — 누적 %,d 부터 · 받는 피해 %d%%".format(s.threshold, (s.damageRate * 100).toInt()),
@@ -139,6 +144,12 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
 
         Panel(title = "파티 편성 (${selected.size + 1}/${raid.partySize})") {
             Text("👑 ${hero.name} · Lv.${hero.level} ${hero.jobName} · 전투력 ${hero.power}", color = GoldBright)
+            Text(
+                "내 이번 주 러닝 %.1fkm → 데미지 ×%.2f".format(raid.myWeeklyKm, raid.myRunBonus) +
+                    if (raid.myWeeklyKm < raid.fullBonusKm) " (%.1fkm 더 뛰면 최대)".format(raid.fullBonusKm - raid.myWeeklyKm) else " (최대!)",
+                color = if (raid.myRunBonus >= 1.0) Gold else Crimson,
+                style = MaterialTheme.typography.bodySmall,
+            )
             if (raid.friends.size < raid.partySize - 1) {
                 Text(
                     "친구가 ${raid.partySize - 1}명 이상 필요합니다 (현재 ${raid.friends.size}명). 친구 메뉴에서 동료를 모으세요.",
@@ -161,8 +172,16 @@ fun RaidScreen(api: ApiClient, hero: HeroInfo, onHeroJson: (JSONObject) -> Unit,
                 ) {
                     Text(if (checked) "☑" else "☐", color = Gold)
                     HeroAvatar(f.job, f.appearance, 36.dp)
-                    Text("${f.name} · Lv.${f.level} ${f.jobName}", color = Parchment, modifier = Modifier.weight(1f))
-                    Text("${f.power}", color = Gold)
+                    val km = raid.friendWeeklyKm[f.id] ?: 0.0
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("${f.name} · Lv.${f.level} ${f.jobName}", color = Parchment)
+                        Text(
+                            "🏃 이번 주 %.1fkm · ×%.2f".format(km, raid.runBonus(km)),
+                            color = if (raid.runBonus(km) >= 1.0) Gold else ParchmentDim,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Text("⚔${f.power}", color = Gold)
                 }
             }
             GoldButton(
@@ -283,7 +302,11 @@ private fun RaidResultPanel(r: RaidResult) {
         }
         Text("파티 기여", color = Gold, fontWeight = FontWeight.Bold)
         r.members.forEach { m ->
-            Text("${m.name} (${m.jobName}) — %,d".format(m.damage), color = Parchment, style = MaterialTheme.typography.bodySmall)
+            Text(
+                "${m.name} (${m.jobName}) — %,d  · 🏃 %.1fkm ×%.2f".format(m.damage, m.weeklyKm, m.runBonus),
+                color = if (m.runBonus >= 1.0) Parchment else ParchmentDim,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         Text("보상: 골드 +${r.rewardGold} · 강화석 +${r.rewardStones}", color = Gold)
         r.item?.let { item ->
