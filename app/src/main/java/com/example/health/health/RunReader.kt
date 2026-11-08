@@ -1,5 +1,6 @@
 package com.example.health.health
 
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.core.content.edit
 import androidx.health.connect.client.HealthConnectClient
@@ -141,6 +142,9 @@ class RunReader(private val context: Context) {
      * 여러 번 눌러도 기록 시간이 겹치지 않도록 직전 테스트 기록 바로 앞 시간대로 거슬러 올라가며 기록한다.
      * (겹치면 거리가 합산돼 "20분에 9km" 같은 속도 초과로 보상이 빠짐)
      */
+    // Android Studio 검사기(lint)가 공개 생성자를 같은 인자 목록의 라이브러리 내부 생성자로 잘못 인식해
+    // "can only be called from within the same library" 를 띄움. 실제 호출은 공개 생성자라 경고만 끈다.
+    @SuppressLint("RestrictedApi")
     suspend fun insertTestRun(km: Double = 3.0) {
         val prefs = context.getSharedPreferences("test_runs", Context.MODE_PRIVATE)
         val now = Instant.now()
@@ -169,7 +173,7 @@ class RunReader(private val context: Context) {
                     metadata = Metadata.manualEntry(),
                     exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_RUNNING,
                     title = "테스트 러닝",
-                    // 경로 인자를 명시해야 라이브러리 내부 전용 생성자가 아닌 공개 생성자가 선택됨
+                    // 공개 생성자에만 있는 인자 (내부 생성자는 exerciseRouteResult)
                     exerciseRoute = null,
                 ),
                 DistanceRecord(
