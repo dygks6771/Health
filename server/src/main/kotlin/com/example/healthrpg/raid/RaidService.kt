@@ -10,11 +10,13 @@ import com.example.healthrpg.game.RaidBoss
 import com.example.healthrpg.game.RaidGrade
 import com.example.healthrpg.game.RaidStage
 import com.example.healthrpg.game.Stat
+import com.example.healthrpg.hero.Hero
 import com.example.healthrpg.hero.HeroResponse
 import com.example.healthrpg.hero.HeroService
 import com.example.healthrpg.hero.HeroSummary
 import com.example.healthrpg.item.ItemFactory
 import com.example.healthrpg.item.ItemResponse
+import com.example.healthrpg.weekly.WeeklyService
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Size
 import org.springframework.stereotype.Service
@@ -43,6 +45,13 @@ data class RaidInfoResponse(
     /** 이번 주 남은 도전 횟수 (주 1회, 월요일 0시 초기화) */
     val remainingThisWeek: Int,
     val resetsAt: Instant,
+    /** 이번 주 내 러닝 거리와 레이드 데미지 배율 */
+    val myWeeklyKm: Double,
+    val myRunBonus: Double,
+    /** 친구 영웅 ID → 이번 주 러닝 거리 */
+    val friendWeeklyKm: Map<Long, Double>,
+    /** 이 거리를 뛰면 배율 최대 */
+    val fullBonusKm: Double,
 )
 
 data class RaidAttackRequest(
@@ -67,6 +76,9 @@ data class RaidMemberResult(
     val jobName: String,
     val appearance: Int,
     val damage: Long,
+    val weeklyKm: Double,
+    /** 러닝 배율 (0.5 ~ 1.5) */
+    val runBonus: Double,
 )
 
 data class RaidResultResponse(
@@ -89,10 +101,12 @@ data class RaidResultResponse(
  * 레이드: 본인 + 친구 4명. 10턴 동안 매 턴 5명이 한 번씩 공격.
  * 누적 데미지가 기준을 넘을 때마다 보스가 진화(최대 4단계)하며 받는 데미지가 줄어든다.
  * 총 데미지로 F~S 등급과 보상이 정해짐. 친구 영웅은 지금 능력치로 함께 싸움(친구가 접속해 있을 필요 없음).
+ * 각자의 데미지에 이번 주 러닝 거리 배율(×0.5~×1.5)이 붙는다 → 파티원 모두 뛰어야 높은 등급.
  */
 @Service
 class RaidService(
     private val heroService: HeroService,
+    private val weeklyService: WeeklyService,
     private val friendService: FriendService,
     private val raidRecordRepository: RaidRecordRepository,
     private val itemFactory: ItemFactory,
@@ -102,6 +116,8 @@ class RaidService(
     fun info(accountId: Long): RaidInfoResponse {
         val hero = heroService.require(accountId)
         val best = raidRecordRepository.findFirstByHeroIdOrderByTotalDamageDesc(hero.id!!)
+        val friends = friendService.acceptedFriends(hero.id!!)
+        val myKm = weeklyKm(hero)
         return RaidInfoResponse(
             bossName = RaidBoss.NAME,
             partySize = RaidBoss.PARTY_SIZE,
@@ -109,11 +125,15 @@ class RaidService(
             staminaCost = RaidBoss.STAMINA_COST,
             stages = RaidBoss.stages,
             grades = RaidBoss.grades,
-            friends = friendService.acceptedFriends(hero.id!!).map(heroService::summary).sortedByDescending { it.power },
+            friends = friends.map(heroService::summary).sortedByDescending { it.power },
             bestGrade = best?.grade,
             bestDamage = best?.totalDamage,
             remainingThisWeek = remaining(hero.id!!),
             resetsAt = weekStart().plus(Duration.ofDays(7)),
+            myWeeklyKm = myKm,
+            myRunBonus = RaidBoss.runBonus(myKm),
+            friendWeeklyKm = friends.associate { it.id!! to weeklyKm(it) },
+            fullBonusKm = RaidBoss.FULL_RUN_BONUS_KM,
         )
     }
 
@@ -129,6 +149,8 @@ class RaidService(
         hero.stamina -= RaidBoss.STAMINA_COST
 
         val partyStats = party.map { heroService.stats(it) }
+        val partyKm = party.map { weeklyKm(it) }
+        val partyBonus = partyKm.map { RaidBoss.runBonus(it) }
         val buff = RaidBoss.spiritBuff(partyStats.sumOf { it[Stat.SPIRIT] ?: 0 })
         val memberDamage = LongArray(party.size)
         val turns = mutableListOf<RaidTurn>()
@@ -140,7 +162,7 @@ class RaidService(
             val stageBefore = stage
             party.forEachIndexed { i, member ->
                 val stats = partyStats[i]
-                var hit = RaidBoss.baseHit(stats, member.job, member.level) * buff * stage.damageRate
+                var hit = RaidBoss.baseHit(stats, member.job, member.level) * buff * stage.damageRate * partyBonus[i]
                 if (random.nextDouble() < RaidBoss.critChance(stats)) hit *= 1.5
                 val damage = hit.toLong()
                 memberDamage[i] += damage
@@ -174,13 +196,17 @@ class RaidService(
             victory = grade.grade != "F",
             chest = ChestResponse.of(chest),
             turns = turns,
-            members = party.mapIndexed { i, m -> RaidMemberResult(m.name, m.job, m.job.displayName, m.appearance, memberDamage[i]) },
+            members = party.mapIndexed { i, m -> RaidMemberResult(m.name, m.job, m.job.displayName, m.appearance, memberDamage[i], partyKm[i], partyBonus[i]) },
             rewardGold = gold,
             rewardStones = stones,
             item = item?.let(ItemResponse::from),
             hero = heroService.response(hero),
         )
     }
+
+    /** 이번 주 러닝 거리. 테스트용 봇은 고정값 */
+    private fun weeklyKm(hero: Hero): Double =
+        if (hero.bot) RaidBoss.BOT_WEEKLY_KM else weeklyService.thisWeekMeters(hero.id!!) / 1000.0
 
     /** 이번 주 월요일 0시 (게임 시간대 기준) */
     fun weekStart(): Instant =

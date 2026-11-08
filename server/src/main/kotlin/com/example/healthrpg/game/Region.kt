@@ -69,6 +69,9 @@ enum class Region(
     /** 4가지 능력치 합계 최소값 (장비 포함). 고티어일수록 장비가 필요 */
     val dungeonMinTotalStats: Int get() = 20 + 24 * (tier - 1)
 
+    /** 원정 지도: 이 지역에 들어가려면 필요한 누적 러닝 거리 */
+    val requiredTotalKm: Int get() = ExpeditionRules.requiredKm(tier)
+
     val dungeonStaminaCost: Int get() = 20
     val dungeonStones: Int get() = 2 * tier
     val dungeonGold: Long get() = 40L * tier

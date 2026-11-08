@@ -8,6 +8,24 @@ object GameRules {
     const val EXP_PER_KM = 50
     const val GOLD_PER_KM = 20
 
+    /**
+     * 부상 예방: 하루 이 거리까지는 보상 100%, 넘는 거리는 [OVER_DAILY_REWARD_RATE] 만큼만.
+     * 상한이 아니라 무리해서 몰아 뛰기보다 꾸준히 뛰도록 유도하는 장치.
+     */
+    const val FULL_REWARD_KM_PER_DAY = 10
+    const val OVER_DAILY_REWARD_RATE = 0.5
+
+    /**
+     * 오늘 이미 [alreadyToday] m 를 뛴 상태에서 [meters] m 를 더 뛰었을 때 보상 계산에 쓰는 거리.
+     * 하루 [FULL_REWARD_KM_PER_DAY] km 를 넘는 부분은 [OVER_DAILY_REWARD_RATE] 배.
+     */
+    fun rewardMeters(meters: Int, alreadyToday: Long): Int {
+        val fullLeft = (FULL_REWARD_KM_PER_DAY * 1000L - alreadyToday).coerceAtLeast(0)
+        val full = minOf(meters.toLong(), fullLeft)
+        val over = meters - full
+        return (full + over * OVER_DAILY_REWARD_RATE).toInt()
+    }
+
     /** 이보다 빠른 평균 속도의 기록은 러닝이 아닌 것으로 보고 보상하지 않음 (차량·자전거 이동 등) */
     const val MAX_SPEED_KMH = 25.0
 
@@ -28,8 +46,8 @@ object GameRules {
 
     fun rewardFor(meters: Int, perKm: Int): Int = (meters.toLong() * perKm / 1000).toInt()
 
-    /** [level] 에서 다음 레벨로 가는 데 필요한 경험치: Lv1→2 는 100, 이후 레벨마다 50씩 증가 */
-    fun expToNextLevel(level: Int): Long = 100L + 50L * (level - 1)
+    /** [level] 에서 다음 레벨로 가는 데 필요한 경험치: Lv1→2 는 100(2km), 이후 레벨마다 30(0.6km)씩 증가 */
+    fun expToNextLevel(level: Int): Long = 100L + 30L * (level - 1)
 
     fun progress(totalExp: Long): LevelProgress {
         var level = 1
@@ -216,6 +234,46 @@ enum class ChestTier(val displayName: String, val multiplier: Double, val weight
             return WOOD
         }
     }
+}
+
+/**
+ * 주간 원정 목표: 지난 4주 동안 뛴 주의 평균보다 조금(10%) 높게, 사람마다 다른 목표.
+ * 달성하면 상자, 연속 달성 주가 길수록 보상이 커진다.
+ */
+object WeeklyRules {
+    const val MIN_GOAL_KM = 5.0
+    const val MAX_GOAL_KM = 50.0
+    const val GROWTH = 1.1
+    const val LOOKBACK_WEEKS = 4
+
+    /** 연속 달성 보너스는 이 주수까지 커짐 */
+    const val MAX_STREAK_BONUS = 5
+
+    /** [pastWeeksKm]: 지난 주들의 러닝 거리. 뛴 주(0 초과)의 평균 × 1.1 을 0.5km 단위로 반올림 */
+    fun goalKm(pastWeeksKm: List<Double>): Double {
+        val active = pastWeeksKm.filter { it > 0.0 }
+        if (active.isEmpty()) return MIN_GOAL_KM
+        val raw = active.average() * GROWTH
+        return (Math.round(raw * 2) / 2.0).coerceIn(MIN_GOAL_KM, MAX_GOAL_KM)
+    }
+
+    /** 이번 주를 달성하면 몇 주 연속이 되는지 기준으로 상자 결정: 3주 연속부터 황금 상자 */
+    fun chest(streak: Int): ChestTier = if (streak >= 3) ChestTier.GOLD else ChestTier.SILVER
+
+    fun gold(level: Int, streak: Int): Long =
+        ((150L + 20L * level) * (1 + 0.1 * streak.coerceAtMost(MAX_STREAK_BONUS))).toLong()
+
+    fun stones(streak: Int): Int = 3 + streak.coerceAtMost(MAX_STREAK_BONUS)
+}
+
+/**
+ * 원정 지도: 누적 러닝 거리로 다음 지역이 열린다 (레벨·능력치 조건과 별개).
+ * 지역 1 은 처음부터, 지역 10 은 누적 225km.
+ */
+object ExpeditionRules {
+    private val REQUIRED_KM = listOf(0, 5, 15, 30, 50, 75, 105, 140, 180, 225)
+
+    fun requiredKm(tier: Int): Int = REQUIRED_KM[(tier - 1).coerceIn(0, REQUIRED_KM.size - 1)]
 }
 
 /** 하루 한 번 받는 출석 보상 */

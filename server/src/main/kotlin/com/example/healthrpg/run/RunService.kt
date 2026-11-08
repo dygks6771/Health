@@ -5,6 +5,7 @@ import com.example.healthrpg.common.BadRequestException
 import com.example.healthrpg.game.GameRules
 import com.example.healthrpg.hero.HeroResponse
 import com.example.healthrpg.hero.HeroService
+import com.example.healthrpg.weekly.WeeklyService
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.PositiveOrZero
@@ -46,6 +47,8 @@ data class RunRewardResponse(
     val statPointsGained: Int,
     /** 보상하지 않은 기록과 이유 */
     val rejected: List<String>,
+    /** 하루 ${GameRules.FULL_REWARD_KM_PER_DAY}km 를 넘어 보상이 절반만 적용된 거리 (부상 예방) */
+    val tiredKm: Double = 0.0,
 ) {
     val leveledUp: Boolean get() = levelAfter > levelBefore
 }
@@ -72,12 +75,18 @@ data class RunHistoryResponse(val runs: List<RunHistoryEntry>)
 class RunService(
     private val heroService: HeroService,
     private val runSessionRepository: RunSessionRepository,
+    private val weeklyService: WeeklyService,
 ) {
     @Transactional
     fun sync(accountId: Long, request: SyncRunsRequest): SyncRunsResponse {
         val hero = heroService.requireForUpdate(accountId)
         val heroId = hero.id!!
+        // 이번 주 목표는 이번 주 기록이 들어오기 전(지난주까지 기록 기준)에 정해 둔다
+        weeklyService.ensureGoal(hero)
         val levelBefore = hero.level
+        var tiredMeters = 0L
+        /** 날짜별로 이미 보상에 반영된 거리 (하루 10km 초과분 계산용) */
+        val countedByDate = mutableMapOf<LocalDate, Long>()
         var newRuns = 0
         var countedMeters = 0L
         var exp = 0L
@@ -97,8 +106,13 @@ class RunService(
             val reason = if (tooFast) "속도 초과 (%.1f km/h)".format(speedKmh) else null
             val counted = if (tooFast) 0 else run.distanceMeters
 
-            val runExp = GameRules.rewardFor(counted, GameRules.EXP_PER_KM)
-            val runGold = GameRules.rewardFor(counted, GameRules.GOLD_PER_KM)
+            val alreadyToday = countedByDate.getOrPut(runDate) { runSessionRepository.sumCountedMeters(heroId, runDate, runDate) }
+            countedByDate[runDate] = alreadyToday + counted
+            val rewardMeters = GameRules.rewardMeters(counted, alreadyToday)
+            // 절반만 반영된 실제 거리
+            tiredMeters += ((counted - rewardMeters) / (1 - GameRules.OVER_DAILY_REWARD_RATE)).toLong()
+            val runExp = GameRules.rewardFor(rewardMeters, GameRules.EXP_PER_KM)
+            val runGold = GameRules.rewardFor(rewardMeters, GameRules.GOLD_PER_KM)
             hero.gold += runGold
 
             runSessionRepository.save(
@@ -135,6 +149,7 @@ class RunService(
                 levelAfter = levelAfter,
                 statPointsGained = GameRules.STAT_POINTS_PER_LEVEL * (levelAfter - levelBefore),
                 rejected = rejected,
+                tiredKm = tiredMeters / 1000.0,
             ),
             hero = heroService.response(hero),
         )

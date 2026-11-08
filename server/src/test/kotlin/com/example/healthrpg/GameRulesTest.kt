@@ -1,5 +1,7 @@
 package com.example.healthrpg
 
+import com.example.healthrpg.game.ChestTier
+import com.example.healthrpg.game.ExpeditionRules
 import com.example.healthrpg.game.GameRules
 import com.example.healthrpg.game.Grade
 import com.example.healthrpg.game.GuildRules
@@ -8,6 +10,7 @@ import com.example.healthrpg.game.ItemRules
 import com.example.healthrpg.game.LevelProgress
 import com.example.healthrpg.game.RaidBoss
 import com.example.healthrpg.game.Region
+import com.example.healthrpg.game.WeeklyRules
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -18,8 +21,8 @@ class GameRulesTest {
     @Test
     fun `running rewards and levels`() {
         assertEquals(250, GameRules.rewardFor(5_000, GameRules.EXP_PER_KM))
-        assertEquals(LevelProgress(level = 2, expInLevel = 0, expToNextLevel = 150), GameRules.progress(100))
-        assertEquals(LevelProgress(level = 4, expInLevel = 10, expToNextLevel = 250), GameRules.progress(460))
+        assertEquals(LevelProgress(level = 2, expInLevel = 0, expToNextLevel = 130), GameRules.progress(100))
+        assertEquals(LevelProgress(level = 4, expInLevel = 70, expToNextLevel = 190), GameRules.progress(460))
     }
 
     @Test
@@ -79,5 +82,26 @@ class GameRulesTest {
         assertEquals("F", RaidBoss.gradeFor(0).grade)
         assertEquals("C", RaidBoss.gradeFor(7_000).grade)
         assertEquals("S", RaidBoss.gradeFor(30_000).grade)
+    }
+
+    @Test
+    fun `weekly goal follows my own recent weeks`() {
+        assertEquals(5.0, WeeklyRules.goalKm(listOf(0.0, 0.0, 0.0, 0.0)))
+        // 뛴 주(10, 8)의 평균 9km × 1.1 = 9.9 → 10.0
+        assertEquals(10.0, WeeklyRules.goalKm(listOf(10.0, 0.0, 8.0, 0.0)))
+        assertEquals(50.0, WeeklyRules.goalKm(listOf(100.0)))
+        assertEquals(ChestTier.SILVER, WeeklyRules.chest(1))
+        assertEquals(ChestTier.GOLD, WeeklyRules.chest(3))
+    }
+
+    @Test
+    fun `over 10km a day gives half rewards and raid damage follows weekly km`() {
+        assertEquals(5_000, GameRules.rewardMeters(5_000, alreadyToday = 0))
+        assertEquals(8_000 + 2_000, GameRules.rewardMeters(12_000, alreadyToday = 2_000))
+        assertEquals(10_000 + 1_000, GameRules.rewardMeters(12_000, alreadyToday = 0))
+        assertEquals(0.5, RaidBoss.runBonus(0.0))
+        assertEquals(1.5, RaidBoss.runBonus(25.0))
+        assertEquals(0, ExpeditionRules.requiredKm(1))
+        assertEquals(225, ExpeditionRules.requiredKm(10))
     }
 }

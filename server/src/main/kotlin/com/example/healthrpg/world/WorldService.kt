@@ -13,6 +13,7 @@ import com.example.healthrpg.hero.HeroResponse
 import com.example.healthrpg.hero.HeroService
 import com.example.healthrpg.item.ItemFactory
 import com.example.healthrpg.item.ItemResponse
+import com.example.healthrpg.run.RunSessionRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.GetMapping
@@ -26,6 +27,8 @@ data class DungeonResponse(
     val boss: String,
     val minLevel: Int,
     val minTotalStats: Int,
+    /** 원정 지도: 필요한 누적 러닝 거리 */
+    val requiredKm: Int,
     val staminaCost: Int,
     val rewardStones: Int,
     val rewardGold: Long,
@@ -46,7 +49,12 @@ data class RegionResponse(
     val dungeon: DungeonResponse,
 )
 
-data class WorldResponse(val totalStats: Int, val regions: List<RegionResponse>)
+data class WorldResponse(
+    val totalStats: Int,
+    /** 누적 러닝 거리 (원정 지도) */
+    val totalKm: Double,
+    val regions: List<RegionResponse>,
+)
 
 data class DungeonResultResponse(
     val dungeon: String,
@@ -64,6 +72,7 @@ data class DungeonResultResponse(
 @Service
 class WorldService(
     private val heroService: HeroService,
+    private val runSessionRepository: RunSessionRepository,
     private val dungeonClearRepository: DungeonClearRepository,
     private val itemFactory: ItemFactory,
     private val random: Random,
@@ -72,10 +81,12 @@ class WorldService(
     fun world(accountId: Long): WorldResponse {
         val hero = heroService.require(accountId)
         val total = heroService.stats(hero).values.sum()
+        val totalKm = totalKm(hero)
         return WorldResponse(
             totalStats = total,
+            totalKm = totalKm,
             regions = Region.entries.map { region ->
-                val reasons = missing(hero, total, region)
+                val reasons = missing(hero, total, totalKm, region)
                 RegionResponse(
                     tier = region.tier,
                     name = region.displayName,
@@ -85,6 +96,7 @@ class WorldService(
                         boss = region.dungeonBoss,
                         minLevel = region.dungeonMinLevel,
                         minTotalStats = region.dungeonMinTotalStats,
+                        requiredKm = region.requiredTotalKm,
                         staminaCost = region.dungeonStaminaCost,
                         rewardStones = region.dungeonStones,
                         rewardGold = region.dungeonGold,
@@ -108,7 +120,7 @@ class WorldService(
         val region = Region.byTier(tier) ?: throw NotFoundException("없는 지역입니다")
         val hero = heroService.requireForUpdate(accountId)
         val total = heroService.stats(hero).values.sum()
-        val reasons = missing(hero, total, region)
+        val reasons = missing(hero, total, totalKm(hero), region)
         if (reasons.isNotEmpty()) throw BadRequestException(reasons.joinToString(", "))
 
         hero.stamina -= region.dungeonStaminaCost
@@ -143,7 +155,10 @@ class WorldService(
         )
     }
 
-    private fun missing(hero: Hero, totalStats: Int, region: Region): List<String> = buildList {
+    private fun totalKm(hero: Hero): Double = runSessionRepository.sumAllCountedMeters(hero.id!!) / 1000.0
+
+    private fun missing(hero: Hero, totalStats: Int, totalKm: Double, region: Region): List<String> = buildList {
+        if (totalKm < region.requiredTotalKm) add("누적 러닝 ${region.requiredTotalKm}km 필요 (현재 %.1fkm)".format(totalKm))
         if (hero.level < region.dungeonMinLevel) add("레벨 ${region.dungeonMinLevel} 필요")
         if (totalStats < region.dungeonMinTotalStats) add("능력치 합계 ${region.dungeonMinTotalStats} 필요")
         if (hero.stamina < region.dungeonStaminaCost) add("행동력 ${region.dungeonStaminaCost} 필요")

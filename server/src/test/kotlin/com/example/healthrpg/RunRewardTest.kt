@@ -49,9 +49,10 @@ class RunRewardTest(
         assertEquals(12.0, tooFast["hero"]["todayKm"].asDouble())
         assertEquals(3.0, tooFast["hero"]["todayRewardKm"].asDouble())
 
-        // 하루 상한 없음: 30km 도 전부 경험치 (정상 속도)
+        // 하루 상한은 없지만 10km 를 넘는 부분은 보상 절반 (부상 예방): 3km 뛴 뒤 30km → 7km 100% + 23km 50%
         val long = syncRun(token, "t3", start.plusSeconds(3600).toString(), start.plusSeconds(3600 + 3 * 3600).toString(), 30_000)
-        assertEquals(1500, long["reward"]["expGained"].asInt())
+        assertEquals(7 * 50 + 23 * 25, long["reward"]["expGained"].asInt())
+        assertEquals(23.0, long["reward"]["tiredKm"].asDouble())
         assertEquals(0, long["hero"]["stamina"].asInt())
 
         val history = api.json(api.get(token, "/api/me/runs"))

@@ -78,4 +78,18 @@ interface RunSessionRepository : JpaRepository<RunSession, Long> {
             "where r.hero.id = :heroId and r.runDate between :from and :to",
     )
     fun sumDistanceMeters(heroId: Long, from: LocalDate, to: LocalDate): Long
+
+    /** 원정 지도용 누적 러닝 거리 (보상에 반영된 거리) */
+    @Query("select coalesce(sum(r.countedMeters), 0) from RunSession r where r.hero.id = :heroId")
+    fun sumAllCountedMeters(heroId: Long): Long
+
+    /** 날짜별 러닝 거리 [runDate, meters] */
+    @Query(
+        "select r.runDate, sum(r.countedMeters) from RunSession r " +
+            "where r.hero.id = :heroId and r.runDate between :from and :to group by r.runDate",
+    )
+    fun dailyCountedMeters(heroId: Long, from: LocalDate, to: LocalDate): List<Array<Any>>
+
+    /** 개인 기록 계산용: 보상에 반영된 1km 이상 러닝 */
+    fun findByHeroIdAndCountedMetersGreaterThanEqual(heroId: Long, meters: Int): List<RunSession>
 }

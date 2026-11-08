@@ -136,6 +136,10 @@ class GameApiTest(
             status { isBadRequest() }
             jsonPath("$.message") { value("레벨 6 필요, 능력치 합계 44 필요") }
         }
+        // 원정 지도: 지역 3 은 누적 15km 필요 (지금 5km)
+        assertEquals(5.0, world["totalKm"].asDouble())
+        assertEquals(15, world["regions"][2]["dungeon"]["requiredKm"].asInt())
+        assertEquals("누적 러닝 15km 필요 (현재 5.0km)", world["regions"][2]["dungeon"]["reasons"][0].asString())
     }
 
     @Test
@@ -203,6 +207,9 @@ class GameApiTest(
         assertTrue(result["totalDamage"].asLong() > 0)
         assertTrue(result["grade"].asString() in listOf("S", "A", "B", "C", "D", "E", "F"))
         assertEquals(150 - 30, result["hero"]["stamina"].asInt())
+        // 러닝 배율: 이번 주 0km → ×0.5, 테스트 봇은 6km → ×1.1
+        assertEquals(0.5, result["members"][0]["runBonus"].asDouble())
+        assertEquals(1.1, result["members"][1]["runBonus"].asDouble(), 1e-9)
 
         api.get(token, "/api/me/raid").andExpect {
             jsonPath("$.friends.length()") { value(4) }

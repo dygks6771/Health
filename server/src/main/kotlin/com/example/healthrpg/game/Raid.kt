@@ -35,6 +35,18 @@ object RaidBoss {
 
     fun gradeFor(totalDamage: Long): RaidGrade = grades.first { totalDamage >= it.minDamage }
 
+    /** 이번 주 이만큼 뛰면 러닝 보너스 최대 (×1.5) */
+    const val FULL_RUN_BONUS_KM = 10.0
+
+    /** 테스트용 친구 봇은 이번 주 이만큼 뛴 것으로 계산 */
+    const val BOT_WEEKLY_KM = 6.0
+
+    /**
+     * 레이드 데미지 배율 = 이번 주 러닝 거리. 0km ×0.5 → 10km 이상 ×1.5.
+     * 파티원이 뛰지 않으면 보스를 잡기 어렵다 → 친구끼리 서로 뛰도록 독려.
+     */
+    fun runBonus(weeklyKm: Double): Double = 0.5 + (weeklyKm / FULL_RUN_BONUS_KM).coerceIn(0.0, 1.0)
+
     /**
      * 영웅 1명의 기본 타격 데미지: 공격력×2 + 직업 주 능력치 + 레벨×3.
      * 민첩성이 높을수록 치명타(1.5배) 확률 증가 (최대 50%).
