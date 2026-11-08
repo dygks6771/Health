@@ -18,6 +18,17 @@ val keystoreProps = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+/**
+ * 개발(debug) 빌드의 기본 서버 주소. 저장소에 올리지 않는 local.properties 에 적는다:
+ *   server.url=http://123.45.67.89:8080
+ * 없으면 USB(adb reverse) 용 http://127.0.0.1:8080. 앱 설정에서 바꾼 주소가 있으면 그게 우선.
+ */
+val debugServerUrl: String = Properties().run {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+    getProperty("server.url")?.trim()?.takeIf { it.isNotEmpty() } ?: "http://127.0.0.1:8080"
+}
+
 /** 출시 빌드가 접속할 서버 (https 필수). gradle.properties 의 releaseServerUrl 로 바꾼다 */
 val releaseServerUrl: String = providers.gradleProperty("releaseServerUrl").getOrElse("https://example.com")
 
@@ -53,8 +64,8 @@ android {
 
     buildTypes {
         debug {
-            // 개발: USB(adb reverse) 로 PC 서버. 설정 화면에서 와이파이 주소로 바꿀 수 있음
-            buildConfigField("String", "DEFAULT_SERVER_URL", "\"http://127.0.0.1:8080\"")
+            // 개발: local.properties 의 server.url (없으면 USB adb reverse 주소). 설정 화면에서 바꿀 수 있음
+            buildConfigField("String", "DEFAULT_SERVER_URL", "\"$debugServerUrl\"")
         }
         release {
             buildConfigField("String", "DEFAULT_SERVER_URL", "\"$releaseServerUrl\"")
