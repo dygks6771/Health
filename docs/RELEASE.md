@@ -20,7 +20,7 @@
 
 출시 앱은 **https 주소만** 접속합니다. 지금 PC 에 바로 올리는 방법:
 
-1. **무료 도메인**: [duckdns.org](https://www.duckdns.org) 에 로그인 → 이름 만들기 (예: `runners` → `runners.duckdns.org`) → current ip 에 PC 공인 IP (`1.235.34.40`) 입력
+1. **무료 도메인**: [duckdns.org](https://www.duckdns.org) 에 로그인 → 이름 만들기 (예: `runners` → `runners.duckdns.org`) → current ip 에 PC 공인 IP (`ipconfig` 의 IPv4 주소) 입력
 2. **방화벽**: 관리자 PowerShell 에서 80·443 포트 열기
    ```powershell
    New-NetFirewallRule -DisplayName "Runners HTTPS" -Direction Inbound -Protocol TCP -LocalPort 80,443 -Action Allow
