@@ -50,6 +50,11 @@ class Session(context: Context) {
         get() = prefs.getString(KEY_REMINDER_NOTIFIED, null)
         set(value) = prefs.edit().putString(KEY_REMINDER_NOTIFIED, value).apply()
 
+    /** 처음 사용 안내(튜토리얼)를 봤는지. 계정마다 한 번 (설정에서 다시 보기 가능) */
+    var tutorialDone: Boolean
+        get() = prefs.getBoolean(KEY_TUTORIAL + (loginId ?: ""), false)
+        set(value) = prefs.edit().putBoolean(KEY_TUTORIAL + (loginId ?: ""), value).apply()
+
     fun logout() {
         prefs.edit().remove(KEY_TOKEN).remove(KEY_HERO).remove(KEY_LAST_SYNC_AT).apply()
     }
@@ -89,5 +94,6 @@ class Session(context: Context) {
         private const val KEY_ASKED_NOTIFICATION = "asked_notification"
         private const val KEY_WEEKLY_NOTIFIED = "weekly_notified"
         private const val KEY_REMINDER_NOTIFIED = "reminder_notified"
+        private const val KEY_TUTORIAL = "tutorial_done_"
     }
 }

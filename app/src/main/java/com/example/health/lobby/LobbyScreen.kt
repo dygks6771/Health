@@ -137,6 +137,8 @@ fun LobbyScreen(
     var syncError by remember { mutableStateOf<String?>(null) }
     var lastSyncAt by remember { mutableLongStateOf(session.lastSyncAt) }
     var menuOpen by remember { mutableStateOf(false) }
+    /** 처음 들어온 계정이면 사용 안내부터 */
+    var showTutorial by remember { mutableStateOf(!session.tutorialDone) }
 
     suspend fun refreshWeekly() {
         runCatching { weekly = WeeklyInfo.from(api.weekly()) }
@@ -235,7 +237,9 @@ fun LobbyScreen(
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         session.notificationsEnabled = granted
     }
-    LaunchedEffect(Unit) {
+    // 튜토리얼과 Health Connect 권한 요청이 끝난 뒤에 묻는다 (권한 창이 겹치지 않도록)
+    LaunchedEffect(showTutorial, needPermission) {
+        if (showTutorial || needPermission) return@LaunchedEffect
         if (Build.VERSION.SDK_INT >= 33 && !session.askedNotificationPermission && !Notifier.canNotify(context)) {
             session.askedNotificationPermission = true
             notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -309,6 +313,20 @@ fun LobbyScreen(
             ) {
                 ChestReveal(chest, onDone = { openingChest = null })
             }
+        }
+
+        if (showTutorial) {
+            TutorialOverlay(
+                onFinish = {
+                    session.tutorialDone = true
+                    showTutorial = false
+                    // 안내 마지막 장에서 말한 대로 바로 운동 기록 권한 요청
+                    scope.launch {
+                        val available = reader.sdkStatus() == HealthConnectClient.SDK_AVAILABLE
+                        if (available && !reader.hasAllPermissions()) permissionLauncher.launch(reader.requestPermissions)
+                    }
+                },
+            )
         }
 
         if (menuOpen) {

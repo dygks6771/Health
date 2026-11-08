@@ -143,6 +143,18 @@ fun SettingsScreen(
             }
         }
 
+        Panel(title = "📖 사용 안내") {
+            Text("처음 시작할 때 본 길드 접수원 리나의 안내를 다시 봅니다.", color = ParchmentDim, style = MaterialTheme.typography.bodySmall)
+            GhostButton(
+                "튜토리얼 다시 보기",
+                onClick = {
+                    session.tutorialDone = false
+                    onBack()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
         Panel(title = "📜 개인정보처리방침") {
             GhostButton(if (showPolicy) "접기" else "보기", onClick = { showPolicy = !showPolicy }, modifier = Modifier.fillMaxWidth())
             if (showPolicy) PrivacyPolicyContent()
