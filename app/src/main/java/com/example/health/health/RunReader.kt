@@ -1,6 +1,7 @@
 package com.example.health.health
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.DistanceRecord
@@ -149,13 +150,13 @@ class RunReader(private val context: Context) {
         if (!now.minusSeconds(20 * 60).isBefore(latestEnd)) {
             // 마지막 테스트 기록과 겹치지 않음 → 방금 끝난 러닝으로 기록
             end = now
-            prefs.edit().putLong(KEY_LATEST_END, now.toEpochMilli()).apply()
+            prefs.edit { putLong(KEY_LATEST_END, now.toEpochMilli()) }
         } else {
             // 연속으로 눌렀음 → 가장 이른 테스트 기록 1분 전에 끝난 러닝으로 기록
             end = earliestStart.minusSeconds(60)
         }
         val start = end.minusSeconds(20 * 60)
-        prefs.edit().putLong(KEY_EARLIEST_START, start.toEpochMilli()).apply()
+        prefs.edit { putLong(KEY_EARLIEST_START, start.toEpochMilli()) }
         val rules = ZoneId.systemDefault().rules
         client.insertRecords(
             // 타입을 명시하지 않으면 내부 전용 공통 타입(IntervalRecord)으로 추론돼 컴파일 오류
@@ -168,6 +169,8 @@ class RunReader(private val context: Context) {
                     metadata = Metadata.manualEntry(),
                     exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_RUNNING,
                     title = "테스트 러닝",
+                    // 경로 인자를 명시해야 라이브러리 내부 전용 생성자가 아닌 공개 생성자가 선택됨
+                    exerciseRoute = null,
                 ),
                 DistanceRecord(
                     startTime = start,
