@@ -10,7 +10,8 @@ services:
       POSTGRES_PASSWORD: healthrpg
       TZ: Asia/Seoul
     ports:
-      - "5432:5432"
+      # 127.0.0.1 에만 연결: 같은 PC 의 서버만 DB 에 접속 가능 (PC 가 인터넷에 직접 연결돼 있어도 DB 는 외부에 노출되지 않음)
+      - "127.0.0.1:5432:5432"
     volumes:
       - health-rpg-db-data:/var/lib/postgresql/data
     healthcheck:
