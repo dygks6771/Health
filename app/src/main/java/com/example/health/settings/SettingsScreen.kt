@@ -31,7 +31,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.health.BuildConfig
 import com.example.health.game.RunHistory
+import androidx.health.connect.client.PermissionController
 import com.example.health.health.RunReader
+import com.example.health.health.TestRecordWriter
 import com.example.health.net.ApiClient
 import com.example.health.net.Session
 import com.example.health.notify.Notifier
@@ -68,6 +70,29 @@ fun SettingsScreen(
     var deleting by remember { mutableStateOf(false) }
     var deletePassword by remember { mutableStateOf("") }
     val actions = rememberActions()
+    val testWriter = remember { TestRecordWriter(context.applicationContext) }
+    val writePermissionLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract(),
+    ) { }
+
+    /** 시연용: 기록을 넣고 바로 동기화해 경험치·행동력이 오르는 것을 보여 준다 */
+    fun addTestRecord(insert: suspend () -> Unit) = actions.run {
+        if (!testWriter.hasWritePermissions()) {
+            writePermissionLauncher.launch(testWriter.writePermissions)
+            "Health Connect 쓰기 권한을 허용한 뒤 다시 눌러 주세요"
+        } else {
+            insert()
+            val r = syncer.sync()
+            session.cachedHeroJson?.let { onHeroJson(JSONObject(it)) }
+            buildString {
+                append("기록 추가 → 동기화 완료")
+                if (r.reward.newRuns > 0) append("\n🏃 EXP +${r.reward.expGained} · 골드 +${r.reward.goldGained}")
+                if (r.reward.leveledUp) append("\n🎉 레벨 업! Lv.${r.reward.levelAfter}")
+                if (r.staminaGained > 0) append("\n👣 행동력 +${r.staminaGained}")
+                if (r.staminaOverflow > 0) append("\n(행동력이 가득 차서 ${r.staminaOverflow} 는 받지 못함)")
+            }
+        }
+    }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         notifications = granted
         session.notificationsEnabled = granted
@@ -140,6 +165,21 @@ fun SettingsScreen(
                     },
                     colors = SwitchDefaults.colors(checkedThumbColor = Ink, checkedTrackColor = Gold),
                 )
+            }
+        }
+
+        // 개발 빌드에서만: 삼성헬스 없이 기록을 넣어 보상 흐름을 보여 주기 (시연 영상 촬영용)
+        if (BuildConfig.DEBUG) {
+            Panel(title = "🎬 시연용 기록 추가 (개발 빌드)") {
+                Text(
+                    "누르면 Health Connect 에 기록을 넣고 바로 동기화합니다. 로비로 돌아가면 오른 경험치·행동력을 볼 수 있어요.",
+                    color = ParchmentDim,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GhostButton("🏃 러닝 3km", onClick = { addTestRecord { testWriter.insertRun(3.0) } }, enabled = !actions.busy, modifier = Modifier.weight(1f))
+                    GhostButton("👣 걸음 3,000보", onClick = { addTestRecord { testWriter.insertSteps(3_000) } }, enabled = !actions.busy, modifier = Modifier.weight(1f))
+                }
             }
         }
 

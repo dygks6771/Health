@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 디버그 빌드에서만 적용: 로컬 개발 서버(http://)에 접속 허용. 릴리스는 HTTPS 만 허용 -->
+<!-- 디버그 빌드에서만 적용 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 시연·테스트용 기록 추가 (설정 → 시연용 기록). 출시 빌드에는 들어가지 않음 -->
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+    <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
+    <uses-permission android:name="android.permission.health.WRITE_STEPS" />
+
+    <!-- 로컬 개발 서버(http://)에 접속 허용. 릴리스는 HTTPS 만 허용 -->
     <application android:usesCleartextTraffic="true" />
 </manifest>
